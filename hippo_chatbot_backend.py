@@ -130,11 +130,14 @@ def chat():
             'timestamp': datetime.now().isoformat()
         })
 
-    except Exception as e:
-        print(f'Chat error: {str(e)}')
+except Exception as e:
+        error_msg = f'Chat error: {type(e).__name__}: {str(e)}'
+        print(error_msg)
+        import traceback
+        print(traceback.format_exc())
         return jsonify({
             'error': 'An error occurred processing your message',
-            'details': str(e) if app.debug else None
+            'details': error_msg if app.debug else None
         }), 500
 
 @app.route('/clear-history', methods=['POST'])
