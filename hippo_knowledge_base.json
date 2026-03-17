@@ -1,0 +1,424 @@
+{
+  "race": {
+    "name": "Hippo Trail Fest",
+    "location": {
+      "venue": "Hippo Social Club",
+      "address": "3250 Limmer Loop Unit 3, Hutto, TX 78634",
+      "googleMaps": "https://maps.app.goo.gl/pERgswBgBVbDZFb28",
+      "nearestCities": ["Hutto", "Taylor", "Round Rock", "Pflugerville", "Georgetown"],
+      "nearestMajorCities": ["Austin", "San Antonio"]
+    },
+    "distances": [
+      "1 Mile Youth Run",
+      "5K",
+      "10K",
+      "10 miles",
+      "20 miles",
+      "50K",
+      "10K Ruck",
+      "10 miles Ruck",
+      "Hippo Haul (5km weight carry)"
+    ]
+  },
+  "schedule": {
+    "raceWeekend": {
+      "friday": {
+        "packetPickup": "4:30pm - 7:00pm at Hippo Social Club",
+        "coursePreviewShakeout": "5:30pm (1 mile and 3 mile options)",
+        "preRaceBriefing": "6:15pm - 6:45pm (drinks provided, not mandatory)"
+      },
+      "saturday": {
+        "packetPickup": "6:30am - 8:45am (all distances except Youth)",
+        "youthPacketPickup": "9:30am - 10:00am",
+        "starts": {
+          "50K": "7:30am",
+          "20mileAnd10mile": "7:40am",
+          "10mileRuck": "7:40am",
+          "10K": "7:50am",
+          "10KRuck": "7:50am",
+          "5K": "7:50am",
+          "hippoHaul": "8:00am",
+          "youthMile": "10:30am"
+        },
+        "startLineClosures": {
+          "50K": "After 7:30am start",
+          "allButYouth": "8:15am",
+          "youthOnly": "Before 10:30am"
+        },
+        "cutoffs": {
+          "finalLap": "4:00pm (must be on your last lap)",
+          "courseClosed": "5:30pm"
+        },
+        "extraActivities": [
+          "Live music throughout morning and afternoon",
+          "Curated Art & Wellness Market",
+          "Recharge Zone (sauna, cold plunge, red light therapy)",
+          "Food & drinks available all morning and afternoon"
+        ],
+        "teardown": "Saturday afternoon to evening"
+      }
+    },
+    "preRaceSetup": {
+      "tuesdayThroughThursday": "Course marking and race hub setup"
+    }
+  },
+  "course": {
+    "overview": "Rolling, well-marked 5-mile loop on soft forest trails",
+    "terrain": "Primarily soft trails through pretty forest with a handful of hills",
+    "terrain_difficulty": "Rolling hills, some elevation gain",
+    "lapStructure": {
+      "50K": "First lap: 1 mile. Laps 2-6: full 5 mile loop",
+      "20miles": "4 laps",
+      "10miles": "2 laps",
+      "10K": "2 laps",
+      "5K": "1 lap",
+      "hippoHaul": "5km loop"
+    },
+    "markings": {
+      "standard": "World-renowned course markings, well above industry standard",
+      "nighttime": "High-grade reflector tape for dark hour races",
+      "colorCoding": "NOT color-coded per distance. Check intersections for distance indicators",
+      "offCourse": "If you get off course, you can get back on and continue. Must complete entire course for official finish."
+    },
+    "policy": "Headphones discouraged due to high volume of runners at different paces",
+    "gpsDownloads": "GPX and PDF elevation profile available for download",
+    "hippoHaul": {
+      "description": "Unique weight-carry race on 5km loop",
+      "format": "Carry a concrete hippo (~5-10 lbs) for the full distance",
+      "rules": "Whoever carries the hippo the farthest wins. One hippo per participant."
+    }
+  },
+  "ruckDivision": {
+    "overview": "Ruck challenge/competition with standardized weight requirements",
+    "awards": "Top finishers rewarded. Same divisions as regular trail runs. All finishers get medals.",
+    "options": "Long course (10K or 10 miles) and less long course (similar distances) available",
+    "weightRequirements": {
+      "under150lbs": "20 lb weight required",
+      "over150lbs": "30 lb weight required",
+      "weightCheck": "Mandatory ruck weigh-in prior to start at timing chip pickup and at finish",
+      "weightRules": [
+        "Weight cannot be consumable or wearable (no food, water, or clothing)",
+        "Must be on back in backpack/ruck, NOT on shoulders or chest",
+        "No sling bags, duffel bags",
+        "Any backpack/ruck is acceptable",
+        "No trekking poles allowed",
+        "Can carry additional gear (food, water, clothing) not counting toward weight requirement"
+      ]
+    }
+  },
+  "aidStations": {
+    "overview": "Fully supported aid station at start/lap/finish and one on-course aid station",
+    "providedItems": "Grab-n-go snacks, fluids",
+    "finish": "Cold sodas and water available at finish line",
+    "cupless": "All races are cupless - bring your own cup or water bottle",
+    "leaveNoTrace": [
+      "Partner of Leave No Trace principles",
+      "Fruit peels count as trash",
+      "No toilet paper in woods - use personal baggie and wipes",
+      "Littering = disqualification from race",
+      "No native flora removal"
+    ]
+  },
+  "dropBags": {
+    "policy": "NO formal drop bag service offered",
+    "alternative": "You can leave personal bags around race hub for retrieval at each lap",
+    "restriction": "Do not leave unattended belongings outside the race hub"
+  },
+  "timing": {
+    "chipTiming": "All races chip-timed with ankle strap",
+    "chipPickup": "Race morning at packet pickup",
+    "chipReturn": "Place chip in bin at finish - head timer collects",
+    "gunVsChipTime": {
+      "gunTime": "From mass start time until you cross finish",
+      "chipTime": "From when you actually cross start line until you cross finish"
+    },
+    "liveUpdates": "Results updated each time runner passes timing mat",
+    "resultsLink": "http://edsresults.com/hippo26"
+  },
+  "dnf": {
+    "definition": "Did Not Finish - runner did not complete registered distance",
+    "policy": "Cutoff is strictly enforced. Missing cutoff by even one second results in DNF",
+    "reasoning": "Respects safety and fairness to other racers",
+    "medal": "Runners who complete shorter distance can request medal for accomplished miles",
+    "cutoffEnforcement": "Cannot continue after cutoff - cannot be flexible"
+  },
+  "awards": {
+    "overall": {
+      "placement": "Top 3 Overall + Top 1 Masters (50 & older)",
+      "format": "Handmade awards given at finish line",
+      "ceremony": "No formal awards ceremony at most events",
+      "policy": "Cannot mail awards - must pick up at finish"
+    },
+    "noDubleDoubledipping": "Runners who place get highest award possible, then out of contention for other awards",
+    "multiRaceChallenge": "Special awards for 500, 1000, 1500km or miles at same event"
+  },
+  "volunteering": {
+    "value": "Essential to race operations - cannot function without volunteers",
+    "benefits": [
+      "Park entry fees and camping fees paid (if role requires overnight)",
+      "Food provided while volunteering",
+      "Shirt, hat, race swag",
+      "All gear needed for task",
+      "Volunteer hours exchanged for future race entries",
+      "Good memories"
+    ],
+    "neededRoles": ["Course marking", "Packet pickup", "Aid stations", "Finish line", "More"],
+    "signup": "tejastrails.com/volunteer"
+  },
+  "swag": {
+    "included": "World-renowned course markings, unique medal, awesome gear",
+    "lateReg": "Everyone who registers after shirt cutoff still gets awesome swag",
+    "swapPolicy": "Can swap swag item after final packet pickup if unsatisfied",
+    "premiumOption": "Upgrade to nicer swag item available at some events",
+    "noSwagOption": "Can opt out of swag for discount at registration",
+    "shirtCutoff": "When shirt count sent to printer - necessary to order in time",
+    "colorNote": "Shirt colors may vary from planned due to supply chain issues"
+  },
+  "gettingThere": {
+    "parking": {
+      "lotA": {
+        "name": "Parking Lot A",
+        "description": "Grass field at Hippo Social Club, closest to race hub",
+        "googleMaps": "https://maps.app.goo.gl/uqrTKN2UAeGcRrF9A"
+      },
+      "lotB": {
+        "name": "Parking Lot B",
+        "description": "Grass field on same side of Limmer Loop, just west of Hippo Social Club",
+        "googleMaps": "https://maps.app.goo.gl/DrQK5CgLrw1fbf46A"
+      },
+      "lotC": {
+        "name": "Parking Lot C",
+        "description": "Parking lot of Cottonwood Creek Elementary, across Limmer Loop from church",
+        "googleMaps": "https://maps.app.goo.gl/2YXjw1ZhQYTANnCt5"
+      }
+    },
+    "runnerDropOff": "Runner drop-off area in parking area for quick drop-off and supply drop",
+    "spectatorFee": "$10 fee collected at parking",
+    "runnerFeePolicy": "Runner entrance fees covered by Tejas Trails"
+  },
+  "camping": {
+    "onSite": "No camping at this event",
+    "nearby": "Race course in middle of Hutto with many lodging options nearby"
+  },
+  "policies": {
+    "moneyRelated": {
+      "specialEventFees": {
+        "definition": "Parks charge for venue access, land usage, parking, setup",
+        "note": "Texas State Parks Passes do NOT cover special event fees"
+      },
+      "insurance": {
+        "provider": "FanShield",
+        "description": "Personal, no-show, event insurance",
+        "process": "Add at checkout during registration",
+        "claims": "Submit with official documentation (doctor, clinic, work, etc.)",
+        "link": "https://requestmyrefund.com/enhancedrefundprogram/refund"
+      },
+      "transfers": {
+        "toPerson": {
+          "description": "Transfer entry to different person",
+          "timeline": "Must request 1+ week before race day",
+          "process": "Transferor emails registration@eventdatasolutions.com, transferee receives 50% discount code, pays difference",
+          "conditions": "One week or more before race"
+        },
+        "toEvent": {
+          "description": "Defer to different Tejas Trails event",
+          "process": "Email registration@eventdatasolutions.com with subject 'Deferral to another event'",
+          "slidingScale": {
+            "90daysPlus": "100% transfer",
+            "30to89days": "75% transfer",
+            "10to29days": "50% transfer",
+            "0to9days": "No transfer"
+          },
+          "adminFee": "$10 held from transferred amount",
+          "restrictions": [
+            "Only to same distance or shorter",
+            "Can only defer once - cannot defer a deferral",
+            "Cannot transfer to another person",
+            "Must use same distance or shorter",
+            "If longer distance, pay difference",
+            "No refund if moving to shorter distance"
+          ]
+        }
+      },
+      "pregnancyDeferral": {
+        "eligibility": "Pregnant after registration, don't want to race",
+        "process": "Submit deferral request with doctor/midwife confirmation before first race day",
+        "email": "registration@eventdatasolutions.com",
+        "benefits": "Automatic entry into any of next three Tejas Trails events, same or shorter distance",
+        "conditions": [
+          "Valid for 3 years",
+          "Same distance or shorter",
+          "If longer distance, pay difference",
+          "Venue-specific fees apply",
+          "Cannot pass to others",
+          "Cannot defer a deferral"
+        ]
+      },
+      "waitLists": {
+        "when": "Activated when race reaches max capacity",
+        "process": "First in, first out by distance",
+        "credits": "Cancellations receive 75% deferral credit for next running"
+      },
+      "refunds": {
+        "policy": "NOT permitted under any circumstances"
+      },
+      "discounts": {
+        "policy": "Cannot retroactively apply discounts. Check for available discounts before registering",
+        "volunteering": "Volunteer hours can be exchanged for future race entries"
+      },
+      "sellingBibs": {
+        "policy": "Strictly prohibited - violation of terms",
+        "reasons": "Insurance, safety, competitive integrity, fraud prevention, fairness"
+      }
+    },
+    "raceCancellations": {
+      "policy": "Hold event unless extreme conditions",
+      "examples": ["Lightning", "Flash flooding", "Hurricane conditions", "Tornados", "Pandemic"],
+      "cancellationProcess": [
+        "Text alert if signed up during registration",
+        "Email notification",
+        "Posted on Tejas Trails Facebook page"
+      },
+      "history": "In hundreds of races, only 3 cancellations (extreme weather)",
+      "override": "Park/city/county official may override decision",
+      "refunds": "No refunds for cancellations",
+      "alternative": "Backup venue or date provided"
+    },
+    "swagIssues": {
+      "lateRegistration": {
+        "process": "Everyone gets swag even after shirt cutoff",
+        "afterPacketPickup": "Receive swag after volunteers are fitted"
+      },
+      "premiumSwag": {
+        "availability": "Some events allow premium swag upgrade at registration",
+        "process": "Choose during online registration"
+      },
+      "noSwagOption": {
+        "description": "Save money by declining swag",
+        "availability": "Available at registration"
+      }
+    },
+    "raceIssues": {
+      "dnf": {
+        "definition": "Did Not Finish",
+        "cutoff": "Strictly enforced",
+        "shortDistance": "Can get medal for shorter distance completed if requested"
+      },
+      "cutoffs": {
+        "purpose": "Mathematical safety limit for final lap start and course closure",
+        "enforcement": "Cannot continue after cutoff"
+      },
+      "offCourse": {
+        "policy": "Can get back on course and continue. Must complete entire course for official finish.",
+        "medal": "Will receive medal for distance completed if it matches an offered distance"
+      },
+      "courseRecords": {
+        "verification": "May need to verify with GPS watch if setting record",
+        "data": "Submit GPS or device data if claiming record"
+      },
+      "earlyStarts": {
+        "policy": "Not supported"
+      },
+      "pacers": {
+        "hippo": "Not allowed at Hippo Trail Fest"
+      },
+      "dogsAllowed": {
+        "racers": "Cannot run with dogs",
+        "spectators": "Can bring dogs to cheer on racers (leashed)"
+      }
+    },
+    "privacy": {
+      "personalInfo": {
+        "usage": "Used for race management. Sometimes shared with sponsors/beneficiaries with notice.",
+        "sharing": "Only registration platform and Tejas Trails have access"
+      },
+      "emails": {
+        "signup": "By e-signing waiver, you give permission to add to general email list",
+        "preRace": "Pre-race specific emails required - contain important info"
+      },
+      "photos": {
+        "policy": "Photos kept private. Used with permission only"
+      }
+    },
+    "regulatory": {
+      "cannabis": "Tejas Trails takes no official position on personal, responsible cannabis use"
+    }
+  },
+  "familyAndYouth": {
+    "philosophy": "Tejas Trails is family-friendly",
+    "features": [
+      "Youth run options",
+      "Family-friendly activities",
+      "Support for training families"
+    ]
+  },
+  "faq": {
+    "general": [
+      {
+        "question": "What's included with my race entry?",
+        "answer": "World-renowned course markings, unique medal, race swag (shirt, hat, etc.), all gear needed for aid stations"
+      },
+      {
+        "question": "Can I swap my swag if I don't like what I get?",
+        "answer": "Yes, you can swap after packet pickup closes, through final packet pickup"
+      },
+      {
+        "question": "Is there camping at Hippo Trail Fest?",
+        "answer": "No camping on-site, but the race is in Hutto with many nearby lodging options"
+      },
+      {
+        "question": "Are refunds available?",
+        "answer": "No. Refunds are not permitted under any circumstances. Consider purchasing can't-make-it insurance."
+      },
+      {
+        "question": "Can I transfer my race entry to someone else?",
+        "answer": "Yes, if requested 1+ week before race day. Transferee receives 50% discount code. Subject to 50% transfer fee."
+      },
+      {
+        "question": "Can I defer to a different event?",
+        "answer": "Yes, on sliding scale: 90+ days = 100%, 30-89 days = 75%, 10-29 days = 50%, 0-9 days = no transfer. $10 admin fee applies."
+      },
+      {
+        "question": "Are pacers allowed?",
+        "answer": "No, pacers are not allowed at Hippo Trail Fest"
+      },
+      {
+        "question": "Can I run with my dog?",
+        "answer": "No, dogs cannot run the race. Spectators can bring leashed dogs to cheer."
+      },
+      {
+        "question": "What if I get off course?",
+        "answer": "You can get back on course and continue. Must complete entire course for official finish. Will get medal for distance completed."
+      },
+      {
+        "question": "What happens if I miss the cutoff?",
+        "answer": "You'll be marked as DNF (Did Not Finish) even if only seconds over. Cutoffs are strictly enforced for safety/fairness."
+      },
+      {
+        "question": "Can I get an early start?",
+        "answer": "No, early starts are not supported"
+      },
+      {
+        "question": "Is the race rain or shine?",
+        "answer": "Yes, races happen rain or shine. Plan for mud if raining."
+      },
+      {
+        "question": "Can I use headphones?",
+        "answer": "Discouraged. High volume of runners at different paces makes it unsafe."
+      },
+      {
+        "question": "What if the race gets cancelled?",
+        "answer": "Only in extreme conditions. No refunds, but backup venue/date provided. Check email, text alerts, Facebook for updates."
+      }
+    ]
+  },
+  "contactInfo": {
+    "generalQuestions": "https://www.tejastrails.com/email-fun",
+    "registrationQuestions": "https://www.tejastrails.com/email-reg",
+    "resultsQuestions": "https://www.tejastrails.com/email-results",
+    "registrationEmail": "registration@eventdatasolutions.com",
+    "facebook": "https://www.facebook.com/TejasTrails",
+    "facebookGroup": "https://www.facebook.com/groups/tejastrailsrunning",
+    "instagram": "https://www.instagram.com/tejastrails/"
+  }
+}
