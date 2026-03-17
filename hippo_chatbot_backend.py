@@ -130,11 +130,11 @@ def chat():
             'timestamp': datetime.now().isoformat()
         })
 
-except Exception as e:
+    except Exception as e:
         error_msg = f'Chat error: {type(e).__name__}: {str(e)}'
         print(error_msg)
         import traceback
-        print(traceback.format_exc())
+        traceback.print_exc()
         return jsonify({
             'error': 'An error occurred processing your message',
             'details': error_msg if app.debug else None
