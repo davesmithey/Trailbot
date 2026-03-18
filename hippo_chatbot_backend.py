@@ -23,7 +23,8 @@ def get_client():
     """Get or create Anthropic client (lazy loading)"""
     global _client
     if _client is None:
-        _client = Anthropic()
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        _client = Anthropic(api_key=api_key)
     return _client
 
 # Load knowledge base
