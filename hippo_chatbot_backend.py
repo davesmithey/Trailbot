@@ -5,7 +5,6 @@ Connects to Claude API for intelligent responses using race knowledge base
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from anthropic import Anthropic
 import json
 import os
 from datetime import datetime
@@ -16,16 +15,33 @@ import requests
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Lazy-load Anthropic client (avoids Python 3.14 compatibility issues)
-_client = None
+def call_claude_api(system_prompt, messages):
+    """Call Claude API directly via requests (bypasses broken Anthropic SDK on Python 3.14)"""
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not set")
 
-def get_client():
-    """Get or create Anthropic client (lazy loading)"""
-    global _client
-    if _client is None:
-        api_key = os.environ.get('ANTHROPIC_API_KEY')
-        _client = Anthropic(api_key=api_key)
-    return _client
+    headers = {
+        'x-api-key': api_key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+    }
+
+    payload = {
+        'model': 'claude-sonnet-4-6',
+        'max_tokens': 500,
+        'system': system_prompt,
+        'messages': messages
+    }
+
+    response = requests.post(
+        'https://api.anthropic.com/v1/messages',
+        headers=headers,
+        json=payload
+    )
+
+    response.raise_for_status()
+    return response.json()
 
 # Load knowledge base
 with open('hippo_knowledge_base.json', 'r') as f:
@@ -190,15 +206,10 @@ def chat():
         })
 
         # Call Claude API with conversation history
-        response = get_client().messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=500,
-            system=get_system_prompt(),
-            messages=conversation
-        )
+        api_response = call_claude_api(get_system_prompt(), conversation)
 
         # Extract response
-        assistant_message = response.content[0].text
+        assistant_message = api_response['content'][0]['text']
 
         # Add assistant response to history
         conversation.append({
