@@ -127,7 +127,7 @@ def chat():
 
         # Call Claude API with conversation history
         response = get_client().messages.create(
-            model='claude-3-5-sonnet-20241022',
+            model='claude-sonnet-4-6',
             max_tokens=500,
             system=get_system_prompt(),
             messages=conversation
