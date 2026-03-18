@@ -41,8 +41,8 @@ def get_system_prompt():
     # Extract key information that's commonly asked about
     location_info = f"{kb['race']['location']['address']}, {kb['race']['location']['venue']}"
     distances = ", ".join(kb['race']['distances'])
-    schedule_50k = kb['race']['schedule']['raceWeekend']['saturday']['starts']['50K']
-    schedule_20mi = kb['race']['schedule']['raceWeekend']['saturday']['starts']['20mileAnd10mile']
+    schedule_50k = kb['schedule']['raceWeekend']['saturday']['starts']['50K']
+    schedule_20mi = kb['schedule']['raceWeekend']['saturday']['starts']['20mileAnd10mile']
 
     return f"""You are a helpful assistant for Hippo Trail Fest, a trail running event in Hutto, Texas.
 You MUST answer every question using the knowledge base below. Do NOT say "I'm not sure" - find the answer in the knowledge base.
