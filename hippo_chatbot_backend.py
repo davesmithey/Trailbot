@@ -9,6 +9,9 @@ from anthropic import Anthropic
 import json
 import os
 from datetime import datetime
+import subprocess
+import base64
+import requests
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -20,7 +23,8 @@ def get_client():
     """Get or create Anthropic client (lazy loading)"""
     global _client
     if _client is None:
-        _client = Anthropic()
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        _client = Anthropic(api_key=api_key)
     return _client
 
 # Load knowledge base
@@ -90,6 +94,62 @@ def get_or_create_conversation(user_id):
     if user_id not in conversations:
         conversations[user_id] = []
     return conversations[user_id]
+
+def verify_api_key(provided_key):
+    """Verify API key against environment variable"""
+    valid_key = os.environ.get('HIPPO_API_KEY', '')
+    return provided_key == valid_key and valid_key != ''
+
+def commit_to_github(new_knowledge_base):
+    """Commit knowledge base changes to GitHub via API"""
+    try:
+        github_token = os.environ.get('GITHUB_TOKEN')
+        github_repo = os.environ.get('GITHUB_REPO', 'davesmithey/Trailbot')
+
+        if not github_token:
+            return False, "GitHub token not configured"
+
+        # Update local file first
+        with open('hippo_knowledge_base.json', 'w') as f:
+            json.dump(new_knowledge_base, f, indent=2)
+
+        # Prepare GitHub API request to update file
+        file_content = json.dumps(new_knowledge_base, indent=2)
+        file_content_encoded = base64.b64encode(file_content.encode()).decode()
+
+        # Get current file SHA (needed for GitHub API update)
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        # Get file info
+        file_url = f'https://api.github.com/repos/{github_repo}/contents/hippo_knowledge_base.json'
+        get_response = requests.get(file_url, headers=headers)
+
+        if get_response.status_code != 200:
+            return False, f"Could not fetch file from GitHub: {get_response.text}"
+
+        current_sha = get_response.json()['sha']
+
+        # Update file via GitHub API
+        commit_message = f"Update knowledge base: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC"
+        update_data = {
+            'message': commit_message,
+            'content': file_content_encoded,
+            'sha': current_sha,
+            'branch': 'main'
+        }
+
+        update_response = requests.put(file_url, json=update_data, headers=headers)
+
+        if update_response.status_code in [200, 201]:
+            return True, "Knowledge base updated and committed to GitHub"
+        else:
+            return False, f"GitHub API error: {update_response.text}"
+
+    except Exception as e:
+        return False, f"Commit error: {str(e)}"
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -166,6 +226,63 @@ def chat():
             'error': 'An error occurred processing your message',
             'details': error_msg if app.debug else None
         }), 500
+
+@app.route('/api/update-knowledge-base', methods=['POST'])
+def update_knowledge_base():
+    """
+    Update knowledge base endpoint (admin only)
+    Requires API key in header: X-API-Key
+    Body: JSON object with updated knowledge base
+    """
+    try:
+        # Verify API key
+        api_key = request.headers.get('X-API-Key', '')
+        if not verify_api_key(api_key):
+            return jsonify({'error': 'Unauthorized: Invalid or missing API key'}), 401
+
+        # Get new knowledge base
+        new_kb = request.json
+        if not new_kb:
+            return jsonify({'error': 'No knowledge base data provided'}), 400
+
+        # Validate it's proper JSON structure
+        if not isinstance(new_kb, dict):
+            return jsonify({'error': 'Knowledge base must be a JSON object'}), 400
+
+        # Update global knowledge base
+        global KNOWLEDGE_BASE
+        KNOWLEDGE_BASE = new_kb
+
+        # Commit to GitHub
+        success, message = commit_to_github(new_kb)
+
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': message,
+                'timestamp': datetime.now().isoformat()
+            }), 200
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'Updated locally but failed to commit: {message}',
+                'timestamp': datetime.now().isoformat()
+            }), 500
+
+    except Exception as e:
+        error_msg = f'Update error: {type(e).__name__}: {str(e)}'
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'An error occurred',
+            'details': error_msg if app.debug else None
+        }), 500
+
+@app.route('/api/knowledge-base', methods=['GET'])
+def get_knowledge_base():
+    """Get current knowledge base (public read access)"""
+    return jsonify(KNOWLEDGE_BASE)
 
 @app.route('/clear-history', methods=['POST'])
 def clear_history():
