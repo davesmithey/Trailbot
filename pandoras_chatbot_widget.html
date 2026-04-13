@@ -1,0 +1,344 @@
+<!-- Pandora's Box of Rox Chatbot Widget -->
+<!-- Embed this on tejastrails.com/pandoras -->
+
+<style>
+  #pandoras-chat-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .chat-bubble {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    color: white;
+    font-size: 28px;
+  }
+
+  .chat-bubble:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-window {
+    display: none;
+    position: absolute;
+    bottom: 90px;
+    right: 0;
+    width: 360px;
+    height: 500px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.2);
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-window.open {
+    display: flex;
+  }
+
+  .chat-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chat-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: #f8f9fa;
+  }
+
+  .message {
+    margin-bottom: 12px;
+    display: flex;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .message.user {
+    justify-content: flex-end;
+  }
+
+  .message-text {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .message.user .message-text {
+    background: #667eea;
+    color: white;
+    border-bottom-right-radius: 2px;
+  }
+
+  .message.assistant .message-text {
+    background: white;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 2px;
+  }
+
+  .chat-input-area {
+    padding: 12px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 8px;
+  }
+
+  .chat-input {
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .chat-input:focus {
+    border-color: #667eea;
+  }
+
+  .chat-send {
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    font-weight: bold;
+  }
+
+  .chat-send:hover {
+    background: #764ba2;
+  }
+
+  .chat-send:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #999;
+    font-size: 12px;
+  }
+
+  .loading span {
+    width: 4px;
+    height: 4px;
+    background: #999;
+    border-radius: 50%;
+    animation: pulse 1.4s infinite;
+  }
+
+  .loading span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .loading span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  @media (max-width: 480px) {
+    .chat-window {
+      width: calc(100vw - 20px);
+      height: calc(100vh - 100px);
+      bottom: 80px;
+    }
+  }
+</style>
+
+<div id="pandoras-chat-widget">
+  <button class="chat-bubble" onclick="toggleChat()">💬</button>
+
+  <div class="chat-window" id="chatWindow">
+    <div class="chat-header">
+      <span>Pandora's Box of Rox</span>
+      <button class="chat-close" onclick="toggleChat()">✕</button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="message assistant">
+        <div class="message-text">Hi! 👋 Ask me anything about Pandora's Box of Rox. When is it? What distances? How to register?</div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <input
+        type="text"
+        class="chat-input"
+        id="messageInput"
+        placeholder="Type a question..."
+        onkeypress="handleKeyPress(event)"
+      />
+      <button class="chat-send" id="sendBtn" onclick="sendMessage()">→</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Configuration - UPDATE THIS to your Render backend URL
+  const API_URL = 'https://pandoras-chatbot-XXXX.onrender.com/chat'; // Replace XXXX with your Render service ID
+
+  let conversationActive = false;
+  let userId = 'user_' + Math.random().toString(36).substr(2, 9);
+
+  function toggleChat() {
+    const chatWindow = document.getElementById('chatWindow');
+    chatWindow.classList.toggle('open');
+  }
+
+  function handleKeyPress(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function addMessage(text, isUser = false) {
+    const messagesContainer = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    textDiv.textContent = text;
+
+    messageDiv.appendChild(textDiv);
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function showLoadingIndicator() {
+    const messagesContainer = document.getElementById('chatMessages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message assistant';
+    loadingDiv.id = 'loadingIndicator';
+
+    const loadingText = document.createElement('div');
+    loadingText.className = 'loading';
+    loadingText.innerHTML = '<span></span><span></span><span></span>';
+
+    loadingDiv.appendChild(loadingText);
+    messagesContainer.appendChild(loadingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function removeLoadingIndicator() {
+    const loading = document.getElementById('loadingIndicator');
+    if (loading) {
+      loading.remove();
+    }
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    const sendBtn = document.getElementById('sendBtn');
+    sendBtn.disabled = true;
+    input.disabled = true;
+
+    // Add user message to display
+    addMessage(message, true);
+    input.value = '';
+
+    // Show loading indicator
+    showLoadingIndicator();
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          user_id: userId,
+          raceId: 'pandoras-box-of-rox'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      removeLoadingIndicator();
+
+      if (data.response) {
+        addMessage(data.response, false);
+      } else if (data.error) {
+        addMessage(`Error: ${data.error}`, false);
+      }
+    } catch (error) {
+      removeLoadingIndicator();
+      console.error('Chat error:', error);
+      addMessage(`Sorry, I had trouble connecting. Please try again. (${error.message})`, false);
+    } finally {
+      sendBtn.disabled = false;
+      input.disabled = false;
+      input.focus();
+    }
+  }
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('messageInput').focus();
+  });
+</script>
