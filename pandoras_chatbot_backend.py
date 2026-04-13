@@ -54,6 +54,10 @@ def get_system_prompt():
     city = knowledge_base.get('race', {}).get('location', {}).get('city', 'Unknown')
     date = knowledge_base.get('schedule', {}).get('raceWeekend', {}).get('date', 'April 25, 2026')
 
+    # Get policies if available
+    policies = knowledge_base.get('policies', {}).get('content', '')
+    policies_section = f"\nTEJAS TRAILS POLICIES:\n{policies}" if policies else ""
+
     knowledge_context = f"""
 QUICK REFERENCE - {race_name}:
 - Race Name: {race_name}
@@ -66,16 +70,17 @@ QUICK REFERENCE - {race_name}:
 - Beginner Friendly: Yes (8 mile and 4 mile options available)
 
 FULL KNOWLEDGE BASE:
-{json.dumps(knowledge_base, indent=2)}
+{json.dumps(knowledge_base, indent=2)}{policies_section}
 
 INSTRUCTIONS:
 1. You are a helpful, friendly chatbot for the {race_name} trail race
 2. Search the knowledge base above to answer questions
 3. Be enthusiastic about the race and trail running
-4. If info is in the knowledge base, use it. If not available, say "I don't have that information yet"
-5. Keep responses concise but informative
-6. Encourage people to register or volunteer
-7. Be supportive and motivating about trail running
+4. If user asks about policies, refer to the TEJAS TRAILS POLICIES section above
+5. If info is in the knowledge base, use it. If not available, say "I don't have that information yet"
+6. Keep responses concise but informative
+7. Encourage people to register or volunteer
+8. Be supportive and motivating about trail running
 
 MANDATORY:
 - Always be friendly and encouraging
