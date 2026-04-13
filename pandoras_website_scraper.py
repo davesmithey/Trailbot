@@ -14,6 +14,7 @@ from datetime import datetime
 
 # Configuration
 WEBSITE_URL = "https://www.tejastrails.com/pandoras"
+POLICIES_URL = "https://www.tejastrails.com/policies"
 KB_FILE = "pandoras_knowledge_base.json"
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 GITHUB_REPO = os.environ.get('GITHUB_REPO', 'davesmithey/Trailbot')
@@ -75,6 +76,51 @@ def parse_website(html):
         print(f"✓ Found venue: Reveille Peak Ranch, Burnet, TX")
 
     return data
+
+def fetch_policies():
+    """Fetch the Tejas Trails policies page"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(POLICIES_URL, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        print(f"Error fetching policies page: {e}")
+        return None
+
+def parse_policies(html):
+    """Parse policies page and extract policy information"""
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Extract main content - look for policy sections
+    policies_text = []
+
+    # Try to find the main content area
+    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
+    if main_content:
+        # Extract all text paragraphs and sections
+        for element in main_content.find_all(['h2', 'h3', 'p']):
+            text = element.get_text(strip=True)
+            if text:
+                policies_text.append(text)
+
+    # If no main content found, try extracting from body
+    if not policies_text:
+        for element in soup.find_all(['h2', 'h3', 'p']):
+            text = element.get_text(strip=True)
+            # Filter out navigation and header elements
+            if text and len(text) > 10:
+                policies_text.append(text)
+
+    # Join all text with line breaks
+    policies_content = "\n".join(policies_text)
+
+    return {
+        'policies_content': policies_content,
+        'policies_raw_html': str(main_content) if main_content else None
+    }
 
 def load_knowledge_base():
     """Load current knowledge base JSON"""
@@ -144,9 +190,22 @@ def update_knowledge_base(kb, scraped_data):
         if changes_made and 'venue_name' in scraped_data:
             print(f"✓ Updated venue: {scraped_data['venue_name']}, {scraped_data.get('venue_location', '')}")
 
+    # Update policies if provided
+    if 'policies_content' in scraped_data:
+        old_policies = kb.get('policies', {}).get('content', '')
+        new_policies = scraped_data['policies_content']
+
+        if old_policies != new_policies and new_policies:
+            if 'policies' not in kb:
+                kb['policies'] = {}
+            kb['policies']['content'] = new_policies
+            kb['policies']['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated policies ({len(new_policies)} chars)")
+
     # Add last updated timestamp
     kb['_lastUpdated'] = datetime.now().isoformat()
-    kb['_source'] = 'Automated scraper from tejastrails.com/pandoras'
+    kb['_source'] = 'Automated scraper from tejastrails.com/pandoras and tejastrails.com/policies'
 
     return kb, changes_made
 
@@ -232,6 +291,21 @@ def main():
         print("✗ No data extracted from website")
         return False
     print("✓ Website parsed")
+
+    # Fetch policies page
+    print(f"\nFetching {POLICIES_URL}...")
+    policies_html = fetch_policies()
+    if policies_html:
+        print("✓ Policies page fetched")
+        print("\nParsing policies content...")
+        policies_data = parse_policies(policies_html)
+        if policies_data and policies_data.get('policies_content'):
+            scraped_data.update(policies_data)
+            print("✓ Policies parsed and added to scraped data")
+        else:
+            print("⚠ Could not extract policies content")
+    else:
+        print("⚠ Failed to fetch policies page (continuing without it)")
 
     # Load current knowledge base
     print("\nLoading knowledge base...")
