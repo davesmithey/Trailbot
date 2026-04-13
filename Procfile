@@ -1,2 +1,2 @@
-web: gunicorn hippo_chatbot_backend:app
-scheduler: python hippo_scheduler.py 1
+web: gunicorn pandoras_chatbot_backend:app
+scheduler: python pandoras_scheduler.py
