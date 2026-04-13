@@ -10,13 +10,27 @@ import json
 import os
 import requests
 from datetime import datetime
+import logging
 
 app = Flask(__name__)
 CORS(app)
 
+# Setup logging
+LOG_FILE = 'pandoras_chat.log'
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()  # Also print to console (Render logs)
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # Global state
 conversations = {}  # Store per-user conversation history
 knowledge_base = {}
+chat_log_entries = []  # Keep recent logs in memory for API access (max 500)
 
 def load_knowledge_base():
     """Load knowledge base from JSON file"""
@@ -127,6 +141,7 @@ def chat():
         user_message = data.get('message', '').strip()
         user_id = data.get('user_id', 'anonymous')
         race_id = data.get('raceId', 'pandoras-box-of-rox')
+        timestamp = datetime.now().isoformat()
 
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
@@ -159,14 +174,29 @@ def chat():
         # Update conversations
         conversations[user_id] = conversation
 
+        # Log the interaction
+        log_entry = {
+            'timestamp': timestamp,
+            'user_id': user_id,
+            'user_message': user_message,
+            'assistant_response': assistant_message,
+            'race_id': race_id
+        }
+        chat_log_entries.append(log_entry)
+        if len(chat_log_entries) > 500:  # Keep max 500 in memory
+            chat_log_entries.pop(0)
+
+        logger.info(f"[{user_id}] User: {user_message[:100]}")
+        logger.info(f"[{user_id}] Bot: {assistant_message[:100]}")
+
         return jsonify({
             'response': assistant_message,
             'user_id': user_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': timestamp
         })
 
     except Exception as e:
-        print(f"Chat error: {type(e).__name__}: {str(e)}")
+        logger.error(f"Chat error: {type(e).__name__}: {str(e)}")
         return jsonify({
             'error': 'An error occurred processing your message',
             'details': str(e)
@@ -191,6 +221,29 @@ def clear_history():
             del conversations[user_id]
             return jsonify({'status': 'cleared', 'user_id': user_id})
         return jsonify({'status': 'not_found', 'user_id': user_id}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logs', methods=['GET'])
+def get_logs():
+    """Get recent chat logs"""
+    limit = request.args.get('limit', 100, type=int)
+    recent_logs = chat_log_entries[-limit:] if limit > 0 else chat_log_entries
+    return jsonify({
+        'total_entries': len(chat_log_entries),
+        'returned': len(recent_logs),
+        'logs': recent_logs
+    })
+
+@app.route('/logs/download', methods=['GET'])
+def download_logs():
+    """Download raw log file"""
+    try:
+        if os.path.exists(LOG_FILE):
+            with open(LOG_FILE, 'r') as f:
+                log_content = f.read()
+            return log_content, 200, {'Content-Type': 'text/plain', 'Content-Disposition': 'attachment; filename=pandoras_chat.log'}
+        return jsonify({'error': 'Log file not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
