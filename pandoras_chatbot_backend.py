@@ -36,6 +36,7 @@ chat_log_entries = []  # Keep recent logs in memory for API access (max 500)
 
 MAX_CONTEXT_CHARS = 16000
 MAX_BLOCK_CHARS = 2500
+UNKNOWN_ANSWER = "That is such a great question that I don't know the answer either. Let's figure it out. If you will please email your question to Fun@TejasTrails.com, my human friends will answer your question and update my database too."
 
 def load_knowledge_base():
     """Load knowledge base from JSON file"""
@@ -145,6 +146,39 @@ def relevant_knowledge(user_message):
 
     return context
 
+def has_relevant_knowledge(user_message):
+    """Check whether the KB has a likely match for this question."""
+    keywords = get_keywords(user_message)
+    if not keywords:
+        return True
+
+    searchable_blocks = [
+        json.dumps({
+            'race': knowledge_base.get('race', {}),
+            'distances': knowledge_base.get('distances', []),
+            'schedule': knowledge_base.get('schedule', {}),
+            'course': knowledge_base.get('course', {}),
+            'registration': knowledge_base.get('registration', {}),
+            'venue_details': knowledge_base.get('venue_details', {}),
+            'race_info': knowledge_base.get('race_info', {}),
+            'waiver': knowledge_base.get('waiver', {}),
+        })
+    ]
+
+    for page_data in knowledge_base.get('source_pages', {}).values():
+        searchable_blocks.extend(page_data.get('sections', {}).values())
+    searchable_blocks.extend(knowledge_base.get('policies', {}).get('sections', {}).values())
+
+    best_match_count = 0
+    for block in searchable_blocks:
+        normalized = normalize_text(block)
+        match_count = sum(1 for keyword in keywords if keyword in normalized)
+        best_match_count = max(best_match_count, match_count)
+
+    if len(keywords) == 1:
+        return best_match_count >= 1
+    return best_match_count >= 2
+
 def get_system_prompt(user_message=''):
     """Build system prompt with knowledge base context"""
     reload_knowledge_base_if_changed()
@@ -173,7 +207,7 @@ INSTRUCTIONS:
 2. Search the knowledge base above to answer questions.
 3. Use an upbeat, encouraging trail-race tone.
 4. If the user asks about policies, use the relevant policies excerpts above.
-5. If info is in the knowledge base, use it. If not available, say "I don't have that information yet."
+5. If the specific answer is not in the knowledge base, reply exactly with: {UNKNOWN_ANSWER}
 6. Keep responses concise but informative.
 
 STYLE RULES:
@@ -250,6 +284,14 @@ def chat():
 
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
+
+        reload_knowledge_base_if_changed()
+        if not has_relevant_knowledge(user_message):
+            return jsonify({
+                'response': UNKNOWN_ANSWER,
+                'user_id': user_id,
+                'timestamp': timestamp
+            })
 
         # Initialize conversation history if needed
         if user_id not in conversations:
