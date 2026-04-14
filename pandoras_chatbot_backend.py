@@ -39,6 +39,22 @@ MAX_CONTEXT_CHARS = 16000
 MAX_BLOCK_CHARS = 2500
 UNKNOWN_ANSWER = "That is such a great question that I don't know the answer either. Let's figure it out. If you will please email your question to Fun@TejasTrails.com, my human friends will answer your question and update my database too."
 
+def log_chat_entry(timestamp, user_id, user_message, assistant_response, race_id):
+    """Store and print a chat exchange for Render logs and /logs."""
+    log_entry = {
+        'timestamp': timestamp,
+        'user_id': user_id,
+        'user_message': user_message,
+        'assistant_response': assistant_response,
+        'race_id': race_id
+    }
+    chat_log_entries.append(log_entry)
+    if len(chat_log_entries) > 500:
+        chat_log_entries.pop(0)
+
+    logger.info(f"[{user_id}] User: {user_message[:100]}")
+    logger.info(f"[{user_id}] Bot: {assistant_response[:100]}")
+
 def load_knowledge_base():
     """Load knowledge base from JSON file"""
     global knowledge_base, knowledge_base_mtime
@@ -314,6 +330,7 @@ def chat():
 
         reload_knowledge_base_if_changed()
         if not has_relevant_knowledge(user_message):
+            log_chat_entry(timestamp, user_id, user_message, UNKNOWN_ANSWER, race_id)
             return jsonify({
                 'response': UNKNOWN_ANSWER,
                 'user_id': user_id,
@@ -349,19 +366,7 @@ def chat():
         conversations[user_id] = conversation
 
         # Log the interaction
-        log_entry = {
-            'timestamp': timestamp,
-            'user_id': user_id,
-            'user_message': user_message,
-            'assistant_response': assistant_message,
-            'race_id': race_id
-        }
-        chat_log_entries.append(log_entry)
-        if len(chat_log_entries) > 500:  # Keep max 500 in memory
-            chat_log_entries.pop(0)
-
-        logger.info(f"[{user_id}] User: {user_message[:100]}")
-        logger.info(f"[{user_id}] Bot: {assistant_message[:100]}")
+        log_chat_entry(timestamp, user_id, user_message, assistant_message, race_id)
 
         return jsonify({
             'response': assistant_message,
