@@ -30,33 +30,47 @@ logger = logging.getLogger(__name__)
 # Global state
 conversations = {}  # Store per-user conversation history
 knowledge_base = {}
+knowledge_base_mtime = None
 chat_log_entries = []  # Keep recent logs in memory for API access (max 500)
 
 def load_knowledge_base():
     """Load knowledge base from JSON file"""
-    global knowledge_base
+    global knowledge_base, knowledge_base_mtime
     try:
-        with open('pandoras_knowledge_base.json', 'r') as f:
+        kb_file = 'pandoras_knowledge_base.json'
+        with open(kb_file, 'r') as f:
             knowledge_base = json.load(f)
+            knowledge_base_mtime = os.path.getmtime(kb_file)
             print(f"✓ Knowledge base loaded: {knowledge_base.get('race', {}).get('name', 'Unknown')}")
     except FileNotFoundError:
         print("⚠ pandoras_knowledge_base.json not found")
         knowledge_base = {}
+        knowledge_base_mtime = None
     except json.JSONDecodeError:
         print("⚠ Invalid JSON in pandoras_knowledge_base.json")
         knowledge_base = {}
+        knowledge_base_mtime = None
+
+def reload_knowledge_base_if_changed():
+    """Reload JSON when the scheduler updates it in the same runtime."""
+    global knowledge_base_mtime
+    kb_file = 'pandoras_knowledge_base.json'
+    try:
+        current_mtime = os.path.getmtime(kb_file)
+    except FileNotFoundError:
+        return
+
+    if knowledge_base_mtime is None or current_mtime != knowledge_base_mtime:
+        load_knowledge_base()
 
 def get_system_prompt():
     """Build system prompt with knowledge base context"""
+    reload_knowledge_base_if_changed()
     race_name = knowledge_base.get('race', {}).get('name', 'Pandora\'s Box of Rox')
     distances = ", ".join(knowledge_base.get('distances', []))
     venue = knowledge_base.get('race', {}).get('location', {}).get('venue', 'Unknown')
     city = knowledge_base.get('race', {}).get('location', {}).get('city', 'Unknown')
     date = knowledge_base.get('schedule', {}).get('raceWeekend', {}).get('date', 'April 25, 2026')
-
-    # Get policies if available
-    policies = knowledge_base.get('policies', {}).get('content', '')
-    policies_section = f"\nTEJAS TRAILS POLICIES:\n{policies}" if policies else ""
 
     knowledge_context = f"""
 QUICK REFERENCE - {race_name}:
@@ -70,7 +84,7 @@ QUICK REFERENCE - {race_name}:
 - Beginner Friendly: Yes (8 mile and 4 mile options available)
 
 FULL KNOWLEDGE BASE:
-{json.dumps(knowledge_base, indent=2)}{policies_section}
+{json.dumps(knowledge_base, indent=2)}
 
 INSTRUCTIONS:
 1. You are a helpful, friendly chatbot for the {race_name} trail race
@@ -127,6 +141,7 @@ def call_claude_api(system_prompt, messages):
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
+    reload_knowledge_base_if_changed()
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
@@ -136,6 +151,7 @@ def health():
 @app.route('/api/knowledge-base', methods=['GET'])
 def get_knowledge_base():
     """Get current knowledge base"""
+    reload_knowledge_base_if_changed()
     return jsonify(knowledge_base)
 
 @app.route('/chat', methods=['POST'])
@@ -252,7 +268,8 @@ def download_logs():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+load_knowledge_base()
+
 if __name__ == '__main__':
-    load_knowledge_base()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

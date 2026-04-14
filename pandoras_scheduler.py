@@ -18,6 +18,9 @@ def schedule_scraper():
     print("  Scraper will run every hour")
     print("="*60 + "\n")
 
+    print("Running initial scrape now...")
+    main()
+
     while True:
         try:
             schedule.run_pending()

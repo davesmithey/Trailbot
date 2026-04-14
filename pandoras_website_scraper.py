@@ -11,13 +11,105 @@ import json
 import os
 import base64
 from datetime import datetime
+import re
 
 # Configuration
-WEBSITE_URL = "https://www.tejastrails.com/pandoras"
+WEBSITE_URL = "https://www.tejastrails.com/pandora"
 POLICIES_URL = "https://www.tejastrails.com/policies"
 KB_FILE = "pandoras_knowledge_base.json"
-GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
-GITHUB_REPO = os.environ.get('GITHUB_REPO', 'davesmithey/Trailbot')
+GITHUB_TOKEN = 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('GITHUB_TOKEN')
+GITHUB_REPO = davesmithey/Trailbot('GITHUB_REPO', 'davesmithey/Trailbot')
+
+CONTENT_TAGS = ['h1', 'h2', 'h3', 'h4', 'p', 'li']
+
+def clean_text(text):
+    """Normalize webpage text without smashing words together."""
+    if not text:
+        return ''
+    text = text.replace('\xa0', ' ')
+    return re.sub(r'\s+', ' ', text).strip()
+
+def extract_main_content(soup):
+    """Find the page content area, falling back to the body if needed."""
+    return (
+        soup.find('main')
+        or soup.find('article')
+        or soup.find('div', class_='content')
+        or soup.body
+        or soup
+    )
+
+def extract_page_text(soup):
+    """Extract readable page text from headings, paragraphs, and list items."""
+    content = extract_main_content(soup)
+    text_blocks = []
+
+    for element in content.find_all(CONTENT_TAGS):
+        text = clean_text(element.get_text(' ', strip=True))
+        if not text:
+            continue
+
+        # Squarespace pages repeat large navigation menus. Keep only useful page
+        # content and drop tiny/common nav labels.
+        if text in {'Open Menu Close Menu', 'Back', 'Register Now', 'Store'}:
+            continue
+        if len(text) < 3:
+            continue
+
+        if not text_blocks or text_blocks[-1] != text:
+            text_blocks.append(text)
+
+    return "\n".join(text_blocks), str(content)
+
+def extract_sections(page_text):
+    """Group full page text under headings so the chatbot can find details."""
+    sections = {}
+    current_heading = 'Overview'
+    current_lines = []
+
+    for line in page_text.splitlines():
+        line = clean_text(line)
+        if not line:
+            continue
+
+        is_heading = (
+            len(line) <= 90
+            and not line.endswith('.')
+            and (
+                line.isupper()
+                or line.startswith('...')
+                or line.startswith('…')
+                or line.lower() in {
+                    'race schedule',
+                    'course information',
+                    'aid stations',
+                    'drop bags',
+                    'swag & stuff',
+                    'rules',
+                    'pacers',
+                    'awards',
+                    'family-friendly',
+                    'getting here',
+                    'lodging',
+                    'history',
+                    'questions',
+                }
+            )
+        )
+
+        if is_heading and current_lines:
+            sections[current_heading] = "\n".join(current_lines).strip()
+            current_heading = line
+            current_lines = []
+        elif is_heading:
+            current_heading = line
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        sections[current_heading] = "\n".join(current_lines).strip()
+
+    return sections
 
 def fetch_website():
     """Fetch the Pandora's Box of Rox webpage"""
@@ -36,6 +128,13 @@ def parse_website(html):
     """Parse website HTML and extract race information"""
     soup = BeautifulSoup(html, 'html.parser')
     data = {}
+
+    page_text, raw_html = extract_page_text(soup)
+    if page_text:
+        data['pandoras_content'] = page_text
+        data['pandoras_sections'] = extract_sections(page_text)
+        data['pandoras_raw_html'] = raw_html
+        print(f"✓ Found Pandora page content ({len(page_text)} chars)")
 
     # Extract race distances
     distances_section = soup.find(string=lambda s: s and "Races:" in s)
@@ -93,33 +192,12 @@ def fetch_policies():
 def parse_policies(html):
     """Parse policies page and extract policy information"""
     soup = BeautifulSoup(html, 'html.parser')
-
-    # Extract main content - look for policy sections
-    policies_text = []
-
-    # Try to find the main content area
-    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
-    if main_content:
-        # Extract all text paragraphs and sections
-        for element in main_content.find_all(['h2', 'h3', 'p']):
-            text = element.get_text(strip=True)
-            if text:
-                policies_text.append(text)
-
-    # If no main content found, try extracting from body
-    if not policies_text:
-        for element in soup.find_all(['h2', 'h3', 'p']):
-            text = element.get_text(strip=True)
-            # Filter out navigation and header elements
-            if text and len(text) > 10:
-                policies_text.append(text)
-
-    # Join all text with line breaks
-    policies_content = "\n".join(policies_text)
+    policies_content, raw_html = extract_page_text(soup)
 
     return {
         'policies_content': policies_content,
-        'policies_raw_html': str(main_content) if main_content else None
+        'policies_sections': extract_sections(policies_content),
+        'policies_raw_html': raw_html
     }
 
 def load_knowledge_base():
@@ -203,6 +281,33 @@ def update_knowledge_base(kb, scraped_data):
             changes_made = True
             print(f"✓ Updated policies ({len(new_policies)} chars)")
 
+        if 'policies_sections' in scraped_data:
+            kb.setdefault('policies', {})['sections'] = scraped_data['policies_sections']
+
+    # Store full source page text so the chatbot can answer detailed questions
+    # that are not represented by the small structured fields above.
+    if 'pandoras_content' in scraped_data:
+        source_pages = kb.setdefault('source_pages', {})
+        pandoras_page = source_pages.setdefault('pandoras', {})
+        if pandoras_page.get('content') != scraped_data['pandoras_content']:
+            pandoras_page['url'] = WEBSITE_URL
+            pandoras_page['content'] = scraped_data['pandoras_content']
+            pandoras_page['sections'] = scraped_data.get('pandoras_sections', {})
+            pandoras_page['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated full Pandora page content ({len(scraped_data['pandoras_content'])} chars)")
+
+    if 'policies_content' in scraped_data:
+        source_pages = kb.setdefault('source_pages', {})
+        policies_page = source_pages.setdefault('policies', {})
+        if policies_page.get('content') != scraped_data['policies_content']:
+            policies_page['url'] = POLICIES_URL
+            policies_page['content'] = scraped_data['policies_content']
+            policies_page['sections'] = scraped_data.get('policies_sections', {})
+            policies_page['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated full policies page content ({len(scraped_data['policies_content'])} chars)")
+
     # Add last updated timestamp
     kb['_lastUpdated'] = datetime.now().isoformat()
     kb['_source'] = 'Automated scraper from tejastrails.com/pandoras and tejastrails.com/policies'
@@ -222,8 +327,8 @@ def save_knowledge_base(kb):
 def commit_to_github(kb):
     """Commit updated knowledge base to GitHub"""
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        print("Warning: GitHub credentials not configured")
-        return False
+        print("Warning: GitHub credentials not configured; skipping remote commit")
+        return None
 
     try:
         # Prepare file content
@@ -331,12 +436,16 @@ def main():
 
     # Commit to GitHub
     print("\nCommitting to GitHub...")
-    if not commit_to_github(kb):
+    github_result = commit_to_github(kb)
+    if github_result is False:
         print("✗ Failed to commit to GitHub")
         return False
 
     print("\n" + "="*60)
-    print("  ✓ SCRAPE COMPLETE - RENDER REDEPLOY TRIGGERED")
+    if github_result is None:
+        print("  ✓ SCRAPE COMPLETE - LOCAL KNOWLEDGE BASE UPDATED")
+    else:
+        print("  ✓ SCRAPE COMPLETE - RENDER REDEPLOY TRIGGERED")
     print("="*60 + "\n")
 
     return True
