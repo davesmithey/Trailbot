@@ -231,10 +231,19 @@
 
 <script>
   // Configuration - UPDATE THIS to your Render backend URL
-  cconst API_URL = 'https://pandoras-chatbot.onrender.com/chat';
+  const API_URL = 'https://pandoras-chatbot-XXXX.onrender.com/chat'; // Replace XXXX with your Render service ID
+  const FALLBACK_MESSAGE = "That is such a great question that I don't know the answer either. Let's figure it out. If you will please email your question to Fun@TejasTrails.com, my human friends will answer your question and update my database too.";
 
   let conversationActive = false;
-  let userId = 'user_' + Math.random().toString(36).substr(2, 9);
+  const userIdKey = 'pandoras_chat_user_id';
+  let userId = localStorage.getItem(userIdKey);
+  if (!userId) {
+    const randomPart = window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    userId = `pandoras-${randomPart}`;
+    localStorage.setItem(userIdKey, userId);
+  }
 
   function toggleChat() {
     const chatWindow = document.getElementById('chatWindow');
@@ -329,7 +338,7 @@
     } catch (error) {
       removeLoadingIndicator();
       console.error('Chat error:', error);
-      addMessage(`Sorry, I had trouble connecting. Please try again. (${error.message})`, false);
+      addMessage(FALLBACK_MESSAGE, false);
     } finally {
       sendBtn.disabled = false;
       input.disabled = false;

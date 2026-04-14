@@ -1,0 +1,365 @@
+<!-- Pandora's Box of Rox Chat Widget -->
+<!-- Paste this entire code block into a Squarespace Code block on the Pandora's Box race page -->
+
+<style>
+  #pandorasWidget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 380px;
+    height: 500px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    display: none;
+    flex-direction: column;
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  #pandorasWidget.open {
+    display: flex;
+  }
+
+  .pandoras-chat-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+  }
+
+  .pandoras-chat-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  #pandorasMessages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: #f8f9fa;
+  }
+
+  .pandoras-chat-message {
+    margin-bottom: 12px;
+    display: flex;
+  }
+
+  .pandoras-chat-message.user {
+    justify-content: flex-end;
+  }
+
+  .pandoras-chat-bubble {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .pandoras-chat-message.user .pandoras-chat-bubble {
+    background: #667eea;
+    color: white;
+    border-radius: 16px 16px 4px 16px;
+  }
+
+  .pandoras-chat-message.bot .pandoras-chat-bubble {
+    background: white;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-radius: 16px 16px 16px 4px;
+  }
+
+  .pandoras-chat-typing {
+    display: flex;
+    gap: 4px;
+    padding: 10px 14px;
+  }
+
+  .pandoras-chat-typing span {
+    width: 8px;
+    height: 8px;
+    background: #999;
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+  }
+
+  .pandoras-chat-typing span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .pandoras-chat-typing span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typing {
+    0%, 60%, 100% { opacity: 0.3; }
+    30% { opacity: 1; }
+  }
+
+  .pandoras-chat-input-area {
+    padding: 12px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 8px;
+  }
+
+  #pandorasInput {
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    outline: none;
+  }
+
+  #pandorasInput:focus {
+    border-color: #667eea;
+  }
+
+  #pandorasSend {
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  #pandorasSend:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+
+  #pandorasToggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9998;
+    transition: transform 0.2s;
+  }
+
+  #pandorasToggle:hover {
+    transform: scale(1.1);
+  }
+
+  #pandorasToggle.hidden {
+    display: none;
+  }
+</style>
+
+<!-- Chat Widget HTML -->
+<button id="pandorasToggle">💬</button>
+
+<div id="pandorasWidget">
+  <div class="pandoras-chat-header">
+    <span>Pandora's Box of Rox</span>
+    <button class="pandoras-chat-close" id="pandorasClose">✕</button>
+  </div>
+  <div id="pandorasMessages"></div>
+  <div class="pandoras-chat-input-area">
+    <input type="text" id="pandorasInput" placeholder="Ask me a question...">
+    <button id="pandorasSend">→</button>
+  </div>
+</div>
+
+<!-- Chat JavaScript -->
+<script>
+  // Configuration
+  const PANDORAS_CONFIG = {
+    apiEndpoint: 'https://pandoras-chatbot.onrender.com/chat',
+    raceId: 'pandoras-box-of-rox',
+    apiKey: '',
+  };
+
+  const PANDORAS_FALLBACK_MESSAGE = "That is such a great question that I don't know the answer either. Let's figure it out. If you will please email your question to Fun@TejasTrails.com, my human friends will answer your question and update my database too.";
+
+  class PandorasChat {
+    constructor() {
+      this.isOpen = false;
+      this.messages = [];
+      this.isLoading = false;
+      this.userId = this.getUserId();
+      this.initElements();
+      this.attachListeners();
+      this.addWelcomeMessage();
+    }
+
+    getUserId() {
+      const storageKey = 'pandoras_chat_user_id';
+      let userId = localStorage.getItem(storageKey);
+      if (!userId) {
+        const randomPart = window.crypto && window.crypto.randomUUID
+          ? window.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        userId = `pandoras-${randomPart}`;
+        localStorage.setItem(storageKey, userId);
+      }
+      return userId;
+    }
+
+    initElements() {
+      this.widget = document.getElementById('pandorasWidget');
+      this.toggle = document.getElementById('pandorasToggle');
+      this.close = document.getElementById('pandorasClose');
+      this.messagesContainer = document.getElementById('pandorasMessages');
+      this.input = document.getElementById('pandorasInput');
+      this.sendBtn = document.getElementById('pandorasSend');
+    }
+
+    attachListeners() {
+      this.toggle.addEventListener('click', () => this.toggleChat());
+      this.close.addEventListener('click', () => this.toggleChat());
+      this.sendBtn.addEventListener('click', () => this.sendMessage());
+      this.input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.sendMessage();
+        }
+      });
+    }
+
+    toggleChat() {
+      this.isOpen = !this.isOpen;
+      this.widget.classList.toggle('open');
+      this.toggle.classList.toggle('hidden');
+      if (this.isOpen) {
+        this.input.focus();
+      }
+    }
+
+    addWelcomeMessage() {
+      const welcome = document.createElement('div');
+      welcome.className = 'pandoras-chat-message bot';
+      welcome.innerHTML = `
+        <div class="pandoras-chat-bubble">
+          <strong>Welcome to Pandora's Box of Rox! 🎉</strong><br><br>
+          I'm here to help with questions about:
+          <ul style="margin-top: 8px; margin-left: 20px;">
+            <li>Race schedule & distances</li>
+            <li>Course details</li>
+            <li>Registration & pricing</li>
+            <li>Volunteering</li>
+            <li>Getting there & parking</li>
+          </ul>
+        </div>
+      `;
+      this.messagesContainer.appendChild(welcome);
+    }
+
+    addMessage(text, isUser = false) {
+      const msg = document.createElement('div');
+      msg.className = `pandoras-chat-message ${isUser ? 'user' : 'bot'}`;
+      msg.innerHTML = `<div class="pandoras-chat-bubble">${this.escapeHtml(text)}</div>`;
+      this.messagesContainer.appendChild(msg);
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+      return msg;
+    }
+
+    addTypingIndicator() {
+      const typing = document.createElement('div');
+      typing.className = 'pandoras-chat-message bot';
+      typing.id = 'pandoras-typing';
+      typing.innerHTML = `
+        <div class="pandoras-chat-typing">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      `;
+      this.messagesContainer.appendChild(typing);
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    }
+
+    removeTypingIndicator() {
+      const typing = document.getElementById('pandoras-typing');
+      if (typing) typing.remove();
+    }
+
+    async sendMessage() {
+      const text = this.input.value.trim();
+      if (!text || this.isLoading) return;
+
+      this.addMessage(text, true);
+      this.input.value = '';
+      this.isLoading = true;
+      this.sendBtn.disabled = true;
+      this.addTypingIndicator();
+
+      try {
+        const response = await this.getResponse(text);
+        this.removeTypingIndicator();
+        this.addMessage(response.text || response, false);
+      } catch (error) {
+        this.removeTypingIndicator();
+        this.addMessage(PANDORAS_FALLBACK_MESSAGE, false);
+        console.error('Chat error:', error);
+      } finally {
+        this.isLoading = false;
+        this.sendBtn.disabled = false;
+        this.input.focus();
+      }
+    }
+
+    async getResponse(userMessage) {
+      try {
+        const response = await fetch(PANDORAS_CONFIG.apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${PANDORAS_CONFIG.apiKey}`,
+          },
+          body: JSON.stringify({
+            message: userMessage,
+            user_id: this.userId,
+            raceId: PANDORAS_CONFIG.raceId,
+            conversationHistory: this.messages
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          this.messages.push({ role: 'user', content: userMessage });
+          this.messages.push({ role: 'assistant', content: data.response });
+          return data.response;
+        }
+      } catch (backendError) {
+        console.warn('Backend unavailable:', backendError);
+      }
+
+      return PANDORAS_FALLBACK_MESSAGE;
+    }
+
+    escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  }
+
+  // Initialize when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    new PandorasChat();
+  });
+</script>

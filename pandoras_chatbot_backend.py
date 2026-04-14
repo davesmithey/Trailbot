@@ -11,6 +11,7 @@ import os
 import requests
 from datetime import datetime
 import logging
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -32,6 +33,9 @@ conversations = {}  # Store per-user conversation history
 knowledge_base = {}
 knowledge_base_mtime = None
 chat_log_entries = []  # Keep recent logs in memory for API access (max 500)
+
+MAX_CONTEXT_CHARS = 16000
+MAX_BLOCK_CHARS = 2500
 
 def load_knowledge_base():
     """Load knowledge base from JSON file"""
@@ -63,7 +67,85 @@ def reload_knowledge_base_if_changed():
     if knowledge_base_mtime is None or current_mtime != knowledge_base_mtime:
         load_knowledge_base()
 
-def get_system_prompt():
+def normalize_text(text):
+    """Normalize text for lightweight keyword matching."""
+    return re.sub(r'[^a-z0-9]+', ' ', (text or '').lower()).strip()
+
+def get_keywords(text):
+    """Extract useful search words from a user question."""
+    stop_words = {
+        'a', 'an', 'and', 'are', 'at', 'be', 'can', 'do', 'does', 'for', 'from',
+        'how', 'i', 'in', 'is', 'it', 'me', 'my', 'of', 'on', 'or', 'the',
+        'there', 'to', 'what', 'when', 'where', 'who', 'with', 'you'
+    }
+    return [word for word in normalize_text(text).split() if len(word) > 2 and word not in stop_words]
+
+def score_text(text, keywords):
+    """Score a knowledge-base block by keyword hits."""
+    normalized = normalize_text(text)
+    if not keywords:
+        return (0, 0, 0, 0)
+
+    matched_keywords = sum(1 for keyword in keywords if keyword in normalized)
+    exact_phrase = 1 if normalize_text(' '.join(keywords)) in normalized else 0
+    all_keywords = 1 if matched_keywords == len(keywords) else 0
+    hit_count = sum(normalized.count(keyword) for keyword in keywords)
+    return (all_keywords, exact_phrase, matched_keywords, hit_count)
+
+def trim_block(block):
+    """Keep retrieved sections compact enough to fit several useful matches."""
+    if len(block) <= MAX_BLOCK_CHARS:
+        return block
+    return block[:MAX_BLOCK_CHARS].rsplit('\n', 1)[0] + "\n[...]"
+
+def relevant_knowledge(user_message):
+    """Return a compact slice of the KB instead of sending the whole JSON."""
+    keywords = get_keywords(user_message)
+    race = knowledge_base.get('race', {})
+    quick_reference = {
+        'race': race,
+        'distances': knowledge_base.get('distances', []),
+        'race_type': knowledge_base.get('race_type'),
+        'schedule': knowledge_base.get('schedule', {}),
+        'course': knowledge_base.get('course', {}),
+        'overview': knowledge_base.get('overview', {}),
+        'registration': knowledge_base.get('registration', {}),
+        'venue_details': knowledge_base.get('venue_details', {}),
+        'race_info': knowledge_base.get('race_info', {}),
+        'waiver': knowledge_base.get('waiver', {}),
+    }
+
+    candidates = []
+    for page_name, page_data in knowledge_base.get('source_pages', {}).items():
+        for heading, content in page_data.get('sections', {}).items():
+            block = f"{page_name.upper()} - {heading}\n{content}"
+            candidates.append((score_text(block, keywords), trim_block(block)))
+
+    for heading, content in knowledge_base.get('policies', {}).get('sections', {}).items():
+        block = f"POLICIES - {heading}\n{content}"
+        candidates.append((score_text(block, keywords), trim_block(block)))
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    selected = [block for score, block in candidates if score[2] > 0][:8]
+
+    if not selected:
+        for page_name, page_data in knowledge_base.get('source_pages', {}).items():
+            overview = page_data.get('sections', {}).get('Overview')
+            if overview:
+                selected.append(f"{page_name.upper()} - Overview\n{overview}")
+
+    context = json.dumps(quick_reference, indent=2)
+    for block in selected:
+        if len(context) + len(block) + 3 > MAX_CONTEXT_CHARS:
+            remaining = MAX_CONTEXT_CHARS - len(context) - 3
+            if remaining > 500:
+                context += "\n\n" + block[:remaining]
+            break
+        context += "\n\n" + block
+
+    return context
+
+def get_system_prompt(user_message=''):
     """Build system prompt with knowledge base context"""
     reload_knowledge_base_if_changed()
     race_name = knowledge_base.get('race', {}).get('name', 'Pandora\'s Box of Rox')
@@ -83,14 +165,14 @@ QUICK REFERENCE - {race_name}:
 - Family Friendly: Yes
 - Beginner Friendly: Yes (8 mile and 4 mile options available)
 
-FULL KNOWLEDGE BASE:
-{json.dumps(knowledge_base, indent=2)}
+RELEVANT KNOWLEDGE BASE EXCERPTS:
+{relevant_knowledge(user_message)}
 
 INSTRUCTIONS:
 1. You are a helpful, friendly chatbot for the {race_name} trail race
 2. Search the knowledge base above to answer questions
 3. Be enthusiastic about the race and trail running
-4. If user asks about policies, refer to the TEJAS TRAILS POLICIES section above
+4. If user asks about policies, use the relevant policies excerpts above
 5. If info is in the knowledge base, use it. If not available, say "I don't have that information yet"
 6. Keep responses concise but informative
 7. Encourage people to register or volunteer
@@ -132,10 +214,13 @@ def call_claude_api(system_prompt, messages):
     response = requests.post(
         'https://api.anthropic.com/v1/messages',
         headers=headers,
-        json=payload
+        json=payload,
+        timeout=30
     )
 
-    response.raise_for_status()
+    if not response.ok:
+        logger.error(f"Anthropic API error {response.status_code}: {response.text[:1000]}")
+        response.raise_for_status()
     return response.json()
 
 @app.route('/health', methods=['GET'])
@@ -160,7 +245,7 @@ def chat():
     try:
         data = request.json
         user_message = data.get('message', '').strip()
-        user_id = data.get('user_id', 'anonymous')
+        user_id = data.get('user_id') or data.get('session_id') or 'anonymous'
         race_id = data.get('raceId', 'pandoras-box-of-rox')
         timestamp = datetime.now().isoformat()
 
@@ -171,8 +256,8 @@ def chat():
         if user_id not in conversations:
             conversations[user_id] = []
 
-        # Keep last 10 exchanges (20 messages)
-        conversation = conversations[user_id][-20:] if len(conversations[user_id]) > 20 else conversations[user_id]
+        # Keep last 4 exchanges (8 messages). The KB excerpts carry the facts.
+        conversation = conversations[user_id][-8:] if len(conversations[user_id]) > 8 else conversations[user_id]
 
         # Add user message to history
         conversation.append({
@@ -181,7 +266,7 @@ def chat():
         })
 
         # Call Claude API with conversation history
-        api_response = call_claude_api(get_system_prompt(), conversation)
+        api_response = call_claude_api(get_system_prompt(user_message), conversation)
 
         # Extract response
         assistant_message = api_response['content'][0]['text']
