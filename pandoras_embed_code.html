@@ -167,6 +167,30 @@
   #pandorasToggle.hidden {
     display: none;
   }
+
+  @media (max-width: 480px) {
+    #pandorasWidget {
+      left: 10px;
+      right: 10px;
+      bottom: 80px;
+      width: calc(100vw - 20px);
+      height: 420px;
+      max-height: calc(100vh - 120px);
+    }
+
+    #pandorasMessages {
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #pandorasInput {
+      font-size: 16px;
+    }
+
+    #pandorasToggle {
+      right: 16px;
+      bottom: 16px;
+    }
+  }
 </style>
 
 <!-- Chat Widget HTML -->
@@ -197,8 +221,10 @@
 
   class PandorasChat {
     constructor() {
+      if (window.__pandorasChatLoaded) return;
+      window.__pandorasChatLoaded = true;
+
       this.isOpen = false;
-      this.messages = [];
       this.isLoading = false;
       this.userId = this.getUserId();
       this.initElements();
@@ -208,13 +234,27 @@
 
     getUserId() {
       const storageKey = 'pandoras_chat_user_id';
-      let userId = localStorage.getItem(storageKey);
+      let userId = null;
+
+      try {
+        userId = window.localStorage ? localStorage.getItem(storageKey) : null;
+      } catch (error) {
+        userId = null;
+      }
+
       if (!userId) {
         const randomPart = window.crypto && window.crypto.randomUUID
           ? window.crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         userId = `pandoras-${randomPart}`;
-        localStorage.setItem(storageKey, userId);
+
+        try {
+          if (window.localStorage) {
+            localStorage.setItem(storageKey, userId);
+          }
+        } catch (error) {
+          // Some iOS privacy modes block localStorage. The in-memory id still works.
+        }
       }
       return userId;
     }
@@ -229,6 +269,10 @@
     }
 
     attachListeners() {
+      if (!this.widget || !this.toggle || !this.close || !this.input || !this.sendBtn) {
+        return;
+      }
+
       this.toggle.addEventListener('click', () => this.toggleChat());
       this.close.addEventListener('click', () => this.toggleChat());
       this.sendBtn.addEventListener('click', () => this.sendMessage());
@@ -244,9 +288,13 @@
       this.isOpen = !this.isOpen;
       this.widget.classList.toggle('open');
       this.toggle.classList.toggle('hidden');
-      if (this.isOpen) {
+      if (this.isOpen && !this.isMobile()) {
         this.input.focus();
       }
+    }
+
+    isMobile() {
+      return window.matchMedia('(max-width: 768px)').matches || navigator.maxTouchPoints > 0;
     }
 
     addWelcomeMessage() {
@@ -318,7 +366,9 @@
       } finally {
         this.isLoading = false;
         this.sendBtn.disabled = false;
-        this.input.focus();
+        if (!this.isMobile()) {
+          this.input.focus();
+        }
       }
     }
 
@@ -333,15 +383,12 @@
           body: JSON.stringify({
             message: userMessage,
             user_id: this.userId,
-            raceId: PANDORAS_CONFIG.raceId,
-            conversationHistory: this.messages
+            raceId: PANDORAS_CONFIG.raceId
           }),
         });
 
         if (response.ok) {
           const data = await response.json();
-          this.messages.push({ role: 'user', content: userMessage });
-          this.messages.push({ role: 'assistant', content: data.response });
           return data.response;
         }
       } catch (backendError) {

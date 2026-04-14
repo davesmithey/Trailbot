@@ -198,6 +198,14 @@
       height: calc(100vh - 100px);
       bottom: 80px;
     }
+
+    .chat-messages {
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .chat-input {
+      font-size: 16px;
+    }
   }
 </style>
 
@@ -259,8 +267,8 @@
     }
   }
 
-  function isMobileSafari() {
-    return /iP(ad|hone|od)/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
+  function isMobile() {
+    return window.matchMedia('(max-width: 768px)').matches || navigator.maxTouchPoints > 0;
   }
 
   function toggleChat() {
@@ -360,7 +368,7 @@
     } finally {
       sendBtn.disabled = false;
       input.disabled = false;
-      if (!isMobileSafari()) {
+      if (!isMobile()) {
         input.focus();
       }
     }
@@ -368,7 +376,7 @@
 
   // Initialize
   document.addEventListener('DOMContentLoaded', function() {
-    if (!isMobileSafari()) {
+    if (!isMobile()) {
       document.getElementById('messageInput').focus();
     }
   });
