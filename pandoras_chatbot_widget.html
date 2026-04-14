@@ -236,13 +236,31 @@
 
   let conversationActive = false;
   const userIdKey = 'pandoras_chat_user_id';
-  let userId = localStorage.getItem(userIdKey);
+  let userId = null;
+
+  try {
+    userId = window.localStorage ? localStorage.getItem(userIdKey) : null;
+  } catch (error) {
+    userId = null;
+  }
+
   if (!userId) {
     const randomPart = window.crypto && window.crypto.randomUUID
       ? window.crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     userId = `pandoras-${randomPart}`;
-    localStorage.setItem(userIdKey, userId);
+
+    try {
+      if (window.localStorage) {
+        localStorage.setItem(userIdKey, userId);
+      }
+    } catch (error) {
+      // Some iOS privacy modes block localStorage. The in-memory id still works.
+    }
+  }
+
+  function isMobileSafari() {
+    return /iP(ad|hone|od)/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
   }
 
   function toggleChat() {
@@ -342,12 +360,16 @@
     } finally {
       sendBtn.disabled = false;
       input.disabled = false;
-      input.focus();
+      if (!isMobileSafari()) {
+        input.focus();
+      }
     }
   }
 
   // Initialize
   document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('messageInput').focus();
+    if (!isMobileSafari()) {
+      document.getElementById('messageInput').focus();
+    }
   });
 </script>
