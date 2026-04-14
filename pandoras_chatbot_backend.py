@@ -190,6 +190,15 @@ def relevant_knowledge(user_message):
 
 def has_relevant_knowledge(user_message):
     """Check whether the KB has a likely match for this question."""
+    normalized_message = normalize_text(user_message)
+    conversational_terms = {
+        'hate', 'scared', 'afraid', 'nervous', 'worried', 'slow', 'beginner',
+        'first timer', 'new runner', 'don t run', 'dont run', 'not a runner',
+        'fun', 'cheer', 'spectate', 'spectator', 'volunteer'
+    }
+    if any(term in normalized_message for term in conversational_terms):
+        return True
+
     keywords = get_keywords(user_message)
     if not keywords:
         return True
@@ -252,14 +261,16 @@ INSTRUCTIONS:
 4. If the user asks about policies, use the relevant policies excerpts above.
 5. If the specific answer is not in the knowledge base, reply exactly with: {UNKNOWN_ANSWER}
 6. Keep responses concise but informative.
+7. For casual, emotional, or playful questions, respond like a warm race helper. It is okay to be personable, reassuring, and lightly funny.
 
 STYLE RULES:
-- Keep responses under 120 words unless the user asks for detail.
+- Keep factual responses under 120 words unless the user asks for detail.
 - Do not use emojis.
 - Do not use markdown bolding or decorative asterisks.
 - Focus on the user's specific question first.
 - When relevant, mention helpful hype points like free spectators, unique swag, clear course markings, beginner-friendly options, or the post-race celebration.
 - Suggest registering or volunteering when it naturally fits the question, but do not force it into every answer.
+- If someone says they dislike, fear, or are unsure about running, invite them into the event in a low-pressure way: spectating, volunteering, cheering, hanging out at the race hub, supporting friends, or trying a beginner-friendly distance.
 """
 
     return f"""You are a helpful trail running chatbot for {race_name}.
