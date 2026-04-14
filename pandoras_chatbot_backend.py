@@ -12,6 +12,7 @@ import requests
 from datetime import datetime
 import logging
 import re
+import math
 
 app = Flask(__name__)
 CORS(app)
@@ -77,7 +78,8 @@ def get_keywords(text):
     stop_words = {
         'a', 'an', 'and', 'are', 'at', 'be', 'can', 'do', 'does', 'for', 'from',
         'how', 'i', 'in', 'is', 'it', 'me', 'my', 'of', 'on', 'or', 'the',
-        'there', 'to', 'what', 'when', 'where', 'who', 'with', 'you'
+        'there', 'to', 'what', 'when', 'where', 'who', 'with', 'you',
+        'pandora', 'pandoras', 'box', 'rox', 'race', 'races', 'event', 'events'
     }
     return [word for word in normalize_text(text).split() if len(word) > 2 and word not in stop_words]
 
@@ -93,11 +95,35 @@ def score_text(text, keywords):
     hit_count = sum(normalized.count(keyword) for keyword in keywords)
     return (all_keywords, exact_phrase, matched_keywords, hit_count)
 
-def trim_block(block):
+def trim_block(block, keywords=None):
     """Keep retrieved sections compact enough to fit several useful matches."""
     if len(block) <= MAX_BLOCK_CHARS:
         return block
-    return block[:MAX_BLOCK_CHARS].rsplit('\n', 1)[0] + "\n[...]"
+
+    keywords = keywords or []
+    normalized_block = normalize_text(block)
+    best_index = -1
+    for keyword in keywords:
+        normalized_index = normalized_block.find(keyword)
+        if normalized_index >= 0:
+            # Use a regular expression search on the original block so the
+            # excerpt starts near the matching word even after normalization.
+            match = re.search(re.escape(keyword), block, re.IGNORECASE)
+            if match:
+                best_index = match.start()
+                break
+
+    if best_index < 0:
+        return block[:MAX_BLOCK_CHARS].rsplit('\n', 1)[0] + "\n[...]"
+
+    start = max(0, best_index - 400)
+    end = min(len(block), start + MAX_BLOCK_CHARS)
+    excerpt = block[start:end]
+    if start > 0:
+        excerpt = "[...]\n" + excerpt
+    if end < len(block):
+        excerpt = excerpt.rsplit('\n', 1)[0] + "\n[...]"
+    return excerpt
 
 def relevant_knowledge(user_message):
     """Return a compact slice of the KB instead of sending the whole JSON."""
@@ -120,11 +146,11 @@ def relevant_knowledge(user_message):
     for page_name, page_data in knowledge_base.get('source_pages', {}).items():
         for heading, content in page_data.get('sections', {}).items():
             block = f"{page_name.upper()} - {heading}\n{content}"
-            candidates.append((score_text(block, keywords), trim_block(block)))
+            candidates.append((score_text(block, keywords), trim_block(block, keywords)))
 
     for heading, content in knowledge_base.get('policies', {}).get('sections', {}).items():
         block = f"POLICIES - {heading}\n{content}"
-        candidates.append((score_text(block, keywords), trim_block(block)))
+        candidates.append((score_text(block, keywords), trim_block(block, keywords)))
 
     candidates.sort(key=lambda item: item[0], reverse=True)
     selected = [block for score, block in candidates if score[2] > 0][:8]
@@ -177,7 +203,8 @@ def has_relevant_knowledge(user_message):
 
     if len(keywords) == 1:
         return best_match_count >= 1
-    return best_match_count >= 2
+    required_matches = 3 if len(keywords) >= 4 else 2
+    return best_match_count >= min(required_matches, len(keywords))
 
 def get_system_prompt(user_message=''):
     """Build system prompt with knowledge base context"""

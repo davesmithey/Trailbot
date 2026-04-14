@@ -17,8 +17,8 @@ import re
 WEBSITE_URL = "https://www.tejastrails.com/pandora"
 POLICIES_URL = "https://www.tejastrails.com/policies"
 KB_FILE = "pandoras_knowledge_base.json"
-GITHUB_TOKEN = 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('GITHUB_TOKEN')
-GITHUB_REPO = davesmithey/Trailbot('GITHUB_REPO', 'davesmithey/Trailbot')
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+GITHUB_REPO = os.environ.get('GITHUB_REPO', 'davesmithey/Trailbot')
 
 CONTENT_TAGS = ['h1', 'h2', 'h3', 'h4', 'p', 'li']
 
@@ -72,6 +72,9 @@ def extract_sections(page_text):
         if not line:
             continue
 
+        if line.endswith('▼'):
+            line = line[:-1].strip()
+
         is_heading = (
             len(line) <= 90
             and not line.endswith('.')
@@ -93,6 +96,11 @@ def extract_sections(page_text):
                     'lodging',
                     'history',
                     'questions',
+                    'volunteering',
+                    'results',
+                    'timing',
+                    'overall awards',
+                    'age group awards',
                 }
             )
         )
@@ -289,7 +297,10 @@ def update_knowledge_base(kb, scraped_data):
     if 'pandoras_content' in scraped_data:
         source_pages = kb.setdefault('source_pages', {})
         pandoras_page = source_pages.setdefault('pandoras', {})
-        if pandoras_page.get('content') != scraped_data['pandoras_content']:
+        if (
+            pandoras_page.get('content') != scraped_data['pandoras_content']
+            or pandoras_page.get('sections') != scraped_data.get('pandoras_sections', {})
+        ):
             pandoras_page['url'] = WEBSITE_URL
             pandoras_page['content'] = scraped_data['pandoras_content']
             pandoras_page['sections'] = scraped_data.get('pandoras_sections', {})
@@ -300,7 +311,10 @@ def update_knowledge_base(kb, scraped_data):
     if 'policies_content' in scraped_data:
         source_pages = kb.setdefault('source_pages', {})
         policies_page = source_pages.setdefault('policies', {})
-        if policies_page.get('content') != scraped_data['policies_content']:
+        if (
+            policies_page.get('content') != scraped_data['policies_content']
+            or policies_page.get('sections') != scraped_data.get('policies_sections', {})
+        ):
             policies_page['url'] = POLICIES_URL
             policies_page['content'] = scraped_data['policies_content']
             policies_page['sections'] = scraped_data.get('policies_sections', {})
