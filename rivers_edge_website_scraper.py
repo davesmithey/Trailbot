@@ -114,6 +114,57 @@ def extract_sections(page_text):
         sections[current_heading] = "\n".join(current_lines).strip()
     return sections
 
+def extract_distances(page_text):
+    """Extract race distances from page text (e.g., '50 mi', '26.2 mi')"""
+    distances = []
+    # Look for patterns like "50 mi", "26.2 miles", "50-mile", etc.
+    patterns = [
+        r'(\d+\.?\d*)\s*(?:mi|mile|miles)',
+        r'(\d+\.?\d*)\s*(?:km|kilometer|kilometers)',
+    ]
+
+    found_distances = set()
+    for pattern in patterns:
+        matches = re.finditer(pattern, page_text, re.IGNORECASE)
+        for match in matches:
+            distance_str = match.group(0).strip()
+            if distance_str not in found_distances:
+                distances.append(distance_str)
+                found_distances.add(distance_str)
+
+    return distances
+
+def extract_race_date(page_text):
+    """Extract race date from page text"""
+    # Look for patterns like "May 15", "May 15-16", "May 15-16, 2026"
+    date_patterns = [
+        r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:,?\s*\d{4})?',
+    ]
+
+    for pattern in date_patterns:
+        match = re.search(pattern, page_text, re.IGNORECASE)
+        if match:
+            return match.group(0).strip()
+
+    return None
+
+def extract_venue_info(page_text):
+    """Extract venue name and location from page text"""
+    # Look for common venue indicators
+    venue_patterns = [
+        r'(?:at|venue|located at|park|state park)\s+([A-Z][A-Za-z\s]+(?:Park|Ranch|Trail|Trail Run))',
+        r'([A-Z][A-Za-z\s]+(?:Park|Ranch|Trail|Trail Run))\s*(?:,?\s+(?:near|in|at)\s+)?([A-Za-z\s]+,?\s*(?:TX|Texas))?',
+    ]
+
+    for pattern in venue_patterns:
+        match = re.search(pattern, page_text)
+        if match:
+            venue_name = match.group(1).strip() if match.group(1) else None
+            if venue_name:
+                return venue_name
+
+    return None
+
 def fetch_url(url):
     """Fetch a webpage"""
     try:
@@ -160,23 +211,48 @@ def update_knowledge_base(kb, scraped_data):
 
     changes_made = False
 
-    # Update River's Edge page content (race overview)
-    if 'rivers_edge_content' in scraped_data:
-        # Initialize race object if needed
-        if 'race' not in kb:
-            kb['race'] = {}
+    # Initialize race object if needed
+    if 'race' not in kb:
+        kb['race'] = {}
+    if 'race_overview' not in kb:
+        kb['race_overview'] = {}
 
-        old_content = kb.get('race_overview', {}).get('content', '')
+    # Update River's Edge page content (race overview) and extract specific fields
+    if 'rivers_edge_content' in scraped_data:
+        old_content = kb['race_overview'].get('content', '')
         new_content = scraped_data['rivers_edge_content']
 
         if old_content != new_content:
-            if 'race_overview' not in kb:
-                kb['race_overview'] = {}
             kb['race_overview']['content'] = new_content
             kb['race_overview']['sections'] = scraped_data.get('rivers_edge_sections', {})
             kb['race_overview']['last_updated'] = datetime.now().isoformat()
             changes_made = True
             print(f"✓ Updated River's Edge race overview ({len(new_content)} chars)")
+
+            # Extract specific fields from race page content
+            # Extract distances
+            distances = extract_distances(new_content)
+            if distances and kb['race'].get('distances') != distances:
+                kb['race']['distances'] = distances
+                changes_made = True
+                print(f"✓ Extracted distances: {', '.join(distances)}")
+
+            # Extract race date
+            race_date = extract_race_date(new_content)
+            if race_date and kb['race'].get('date') != race_date:
+                kb['race']['date'] = race_date
+                changes_made = True
+                print(f"✓ Extracted race date: {race_date}")
+
+            # Extract venue
+            venue = extract_venue_info(new_content)
+            if venue:
+                if 'location' not in kb['race']:
+                    kb['race']['location'] = {}
+                if kb['race']['location'].get('venue') != venue:
+                    kb['race']['location']['venue'] = venue
+                    changes_made = True
+                    print(f"✓ Extracted venue: {venue}")
 
     # Update Policies page content
     if 'policies_content' in scraped_data:
