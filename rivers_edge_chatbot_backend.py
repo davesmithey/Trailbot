@@ -109,7 +109,7 @@ def health():
         'kb_loaded': bool(knowledge_base)
     })
 
-@app.route('/scrape', methods=['POST'])
+@app.route('/scrape', methods=['GET', 'POST'])
 def manual_scrape():
     """Manually trigger the scraper"""
     try:
