@@ -109,6 +109,26 @@ def health():
         'kb_loaded': bool(knowledge_base)
     })
 
+@app.route('/scrape', methods=['POST'])
+def manual_scrape():
+    """Manually trigger the scraper"""
+    try:
+        logger.info("Manual scrape requested")
+        from rivers_edge_website_scraper import main
+        success = main()
+        return jsonify({
+            'status': 'success' if success else 'failed',
+            'message': 'Scraper executed',
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Scrape error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 @app.route('/chat', methods=['POST'])
 def chat():
     """Main chat endpoint"""
