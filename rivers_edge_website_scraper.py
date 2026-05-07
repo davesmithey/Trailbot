@@ -230,30 +230,30 @@ def update_knowledge_base(kb, scraped_data):
             changes_made = True
             print(f"✓ Updated River's Edge race overview ({len(new_content)} chars)")
 
-            # Extract specific fields from race page content
-            # Extract distances
-            distances = extract_distances(new_content)
-            if distances and kb['race'].get('distances') != distances:
-                kb['race']['distances'] = distances
-                changes_made = True
-                print(f"✓ Extracted distances: {', '.join(distances)}")
+        # Extract specific fields from race page content (MOVED OUTSIDE if block)
+        # Extract distances
+        distances = extract_distances(new_content)
+        if distances and kb['race'].get('distances') != distances:
+            kb['race']['distances'] = distances
+            changes_made = True
+            print(f"✓ Extracted distances: {', '.join(distances)}")
 
-            # Extract race date
-            race_date = extract_race_date(new_content)
-            if race_date and kb['race'].get('date') != race_date:
-                kb['race']['date'] = race_date
-                changes_made = True
-                print(f"✓ Extracted race date: {race_date}")
+        # Extract race date
+        race_date = extract_race_date(new_content)
+        if race_date and kb['race'].get('date') != race_date:
+            kb['race']['date'] = race_date
+            changes_made = True
+            print(f"✓ Extracted race date: {race_date}")
 
-            # Extract venue
-            venue = extract_venue_info(new_content)
-            if venue:
-                if 'location' not in kb['race']:
-                    kb['race']['location'] = {}
-                if kb['race']['location'].get('venue') != venue:
-                    kb['race']['location']['venue'] = venue
-                    changes_made = True
-                    print(f"✓ Extracted venue: {venue}")
+        # Extract venue
+        venue = extract_venue_info(new_content)
+        if venue:
+            if 'location' not in kb['race']:
+                kb['race']['location'] = {}
+            if kb['race']['location'].get('venue') != venue:
+                kb['race']['location']['venue'] = venue
+                changes_made = True
+                print(f"✓ Extracted venue: {venue}")
 
     # Update Policies page content
     if 'policies_content' in scraped_data:
