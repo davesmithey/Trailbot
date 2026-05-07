@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>River's Edge Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: transparent;
+        }
+
+        .rivers-edge-chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            max-height: 600px;
+            border-radius: 12px;
+            box-shadow: 0 5px 40px rgba(0, 0, 0, 0.2);
+            background: white;
+            display: flex;
+            flex-direction: column;
+            z-index: 9999;
+            font-family: inherit;
+        }
+
+        .rivers-edge-chat-header {
+            background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .rivers-edge-chat-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .rivers-edge-chat-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rivers-edge-chat-close:hover {
+            opacity: 0.8;
+        }
+
+        .rivers-edge-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .rivers-edge-chat-message {
+            display: flex;
+            gap: 8px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .rivers-edge-chat-message.user {
+            justify-content: flex-end;
+        }
+
+        .rivers-edge-chat-bubble {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .rivers-edge-chat-message.assistant .rivers-edge-chat-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .rivers-edge-chat-message.user .rivers-edge-chat-bubble {
+            background: #2E7D32;
+            color: white;
+        }
+
+        .rivers-edge-chat-input-area {
+            border-top: 1px solid #e0e0e0;
+            padding: 12px;
+            background: white;
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .rivers-edge-chat-input {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            max-height: 100px;
+        }
+
+        .rivers-edge-chat-input:focus {
+            outline: none;
+            border-color: #2E7D32;
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+        }
+
+        .rivers-edge-chat-send {
+            background: #2E7D32;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+
+        .rivers-edge-chat-send:hover {
+            background: #1B5E20;
+        }
+
+        .rivers-edge-chat-send:active {
+            transform: scale(0.95);
+        }
+
+        .rivers-edge-chat-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #2E7D32;
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+            transition: all 0.3s;
+            z-index: 9998;
+        }
+
+        .rivers-edge-chat-button:hover {
+            background: #1B5E20;
+            box-shadow: 0 6px 16px rgba(46, 125, 50, 0.4);
+        }
+
+        .rivers-edge-chat-button:active {
+            transform: scale(0.95);
+        }
+
+        .rivers-edge-chat-hidden {
+            display: none;
+        }
+
+        .rivers-edge-chat-loading {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .rivers-edge-chat-loading span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: pulse 1.4s infinite;
+        }
+
+        .rivers-edge-chat-loading span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .rivers-edge-chat-loading span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 60%, 100% {
+                opacity: 0.3;
+            }
+            30% {
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .rivers-edge-chat-widget {
+                width: 100%;
+                height: 100%;
+                max-height: none;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+            }
+
+            .rivers-edge-chat-bubble {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="riversEdgeChatButton" class="rivers-edge-chat-button">💬</div>
+
+    <div id="riversEdgeChatWidget" class="rivers-edge-chat-widget rivers-edge-chat-hidden">
+        <div class="rivers-edge-chat-header">
+            <h3>River's Edge Chat</h3>
+            <button class="rivers-edge-chat-close" id="riversEdgeChatClose">✕</button>
+        </div>
+        <div class="rivers-edge-chat-messages" id="riversEdgeChatMessages"></div>
+        <div class="rivers-edge-chat-input-area">
+            <input
+                type="text"
+                class="rivers-edge-chat-input"
+                id="riversEdgeChatInput"
+                placeholder="Ask about River's Edge..."
+                autocomplete="off"
+            >
+            <button class="rivers-edge-chat-send" id="riversEdgeChatSend">→</button>
+        </div>
+    </div>
+
+    <script>
+        class RiversEdgeChatWidget {
+            constructor() {
+                this.apiUrl = 'https://rivers-edge-chatbot.onrender.com/chat'; // Update with your Render URL
+                this.userId = this.generateUserId();
+                this.isOpen = false;
+                this.isLoading = false;
+
+                this.widget = document.getElementById('riversEdgeChatWidget');
+                this.button = document.getElementById('riversEdgeChatButton');
+                this.closeBtn = document.getElementById('riversEdgeChatClose');
+                this.messagesContainer = document.getElementById('riversEdgeChatMessages');
+                this.input = document.getElementById('riversEdgeChatInput');
+                this.sendBtn = document.getElementById('riversEdgeChatSend');
+
+                this.setupEventListeners();
+                this.addWelcomeMessage();
+            }
+
+            generateUserId() {
+                return 'user_' + Math.random().toString(36).substr(2, 9);
+            }
+
+            setupEventListeners() {
+                this.button.addEventListener('click', () => this.toggle());
+                this.closeBtn.addEventListener('click', () => this.close());
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+            }
+
+            toggle() {
+                this.isOpen ? this.close() : this.open();
+            }
+
+            open() {
+                this.isOpen = true;
+                this.widget.classList.remove('rivers-edge-chat-hidden');
+                this.button.classList.add('rivers-edge-chat-hidden');
+                this.input.focus();
+            }
+
+            close() {
+                this.isOpen = false;
+                this.widget.classList.add('rivers-edge-chat-hidden');
+                this.button.classList.remove('rivers-edge-chat-hidden');
+            }
+
+            addWelcomeMessage() {
+                const welcomeMsg = document.createElement('div');
+                welcomeMsg.className = 'rivers-edge-chat-message assistant';
+                welcomeMsg.innerHTML = `
+                    <div class="rivers-edge-chat-bubble">
+                        👋 Hi! I'm the River's Edge chatbot. Ask me anything about the race, registration, policies, or course information!
+                    </div>
+                `;
+                this.messagesContainer.appendChild(welcomeMsg);
+                this.scrollToBottom();
+            }
+
+            addMessage(content, isUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `rivers-edge-chat-message ${isUser ? 'user' : 'assistant'}`;
+                messageDiv.innerHTML = `<div class="rivers-edge-chat-bubble">${this.escapeHtml(content)}</div>`;
+                this.messagesContainer.appendChild(messageDiv);
+                this.scrollToBottom();
+            }
+
+            showLoading() {
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'rivers-edge-chat-message assistant';
+                loadingDiv.id = 'loading-message';
+                loadingDiv.innerHTML = `
+                    <div class="rivers-edge-chat-loading">
+                        <span></span><span></span><span></span>
+                    </div>
+                `;
+                this.messagesContainer.appendChild(loadingDiv);
+                this.scrollToBottom();
+            }
+
+            removeLoading() {
+                const loading = document.getElementById('loading-message');
+                if (loading) loading.remove();
+            }
+
+            async sendMessage() {
+                const message = this.input.value.trim();
+                if (!message || this.isLoading) return;
+
+                this.addMessage(message, true);
+                this.input.value = '';
+                this.isLoading = true;
+                this.showLoading();
+
+                try {
+                    const response = await fetch(this.apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            user_id: this.userId
+                        })
+                    });
+
+                    this.removeLoading();
+
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    this.addMessage(data.response, false);
+                } catch (error) {
+                    this.removeLoading();
+                    this.addMessage('Sorry, I encountered an error. Please try again or contact registration@eventdatasolutions.com', false);
+                    console.error('Chat error:', error);
+                } finally {
+                    this.isLoading = false;
+                    this.input.focus();
+                }
+            }
+
+            scrollToBottom() {
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                new RiversEdgeChatWidget();
+            });
+        } else {
+            new RiversEdgeChatWidget();
+        }
+    </script>
+</body>
+</html>

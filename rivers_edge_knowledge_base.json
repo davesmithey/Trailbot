@@ -1,0 +1,77 @@
+{
+  "race": {
+    "id": "rivers-edge",
+    "name": "River's Edge Trail Run",
+    "year": 2026,
+    "tagline": "Trail running by the water",
+    "location": {
+      "venue": "TBD",
+      "city": "TBD",
+      "address": "TBD",
+      "region": "Texas"
+    },
+    "distances": [],
+    "date": "TBD"
+  },
+  "distances": [],
+  "race_type": "Trail Race",
+  "schedule": {
+    "raceWeekend": {
+      "date": "TBD",
+      "packetPickup": "TBD",
+      "briefing": "TBD",
+      "starts": {},
+      "cutoffs": "TBD"
+    }
+  },
+  "course": {
+    "terrain": "TBD",
+    "loop_type": "TBD",
+    "highlights": [],
+    "aid_stations": "TBD",
+    "post_race": "TBD"
+  },
+  "overview": {
+    "description": "TBD",
+    "features": []
+  },
+  "registration": {
+    "is_open": true,
+    "register_link": "https://www.tejastrails.com/edge",
+    "early_bird_price": "TBD",
+    "regular_price": "TBD"
+  },
+  "venue_details": {
+    "venue_name": "TBD",
+    "location": "TBD",
+    "parking": "TBD",
+    "facilities": [],
+    "nearby_towns": "TBD"
+  },
+  "race_info": {
+    "spectators": "TBD",
+    "swag": "TBD",
+    "course_marking": "TBD",
+    "beginner_friendly": true,
+    "family_friendly": true
+  },
+  "waiver": {
+    "required": true,
+    "note": "Everyone must fill out a waiver.",
+    "location": "TBD"
+  },
+  "policies": {
+    "content": "",
+    "last_updated": "TBD"
+  },
+  "about": {
+    "content": "",
+    "last_updated": "TBD"
+  },
+  "aid_stations": {
+    "content": "",
+    "last_updated": "TBD"
+  },
+  "_lastUpdated": "TBD",
+  "_source": "Automated scraper from tejastrails.com/edge, /policies, /about, and /aid-station-info"
+}
