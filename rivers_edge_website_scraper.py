@@ -160,64 +160,71 @@ def update_knowledge_base(kb, scraped_data):
 
     changes_made = False
 
-    # Store full source pages so the chatbot can answer detailed questions
-    source_pages = kb.setdefault('source_pages', {})
-
-    # Update River's Edge page content
+    # Update River's Edge page content (race overview)
     if 'rivers_edge_content' in scraped_data:
-        rivers_edge_page = source_pages.setdefault('rivers_edge', {})
-        if (
-            rivers_edge_page.get('content') != scraped_data['rivers_edge_content']
-            or rivers_edge_page.get('sections') != scraped_data.get('rivers_edge_sections', {})
-        ):
-            rivers_edge_page['url'] = WEBSITE_URL
-            rivers_edge_page['content'] = scraped_data['rivers_edge_content']
-            rivers_edge_page['sections'] = scraped_data.get('rivers_edge_sections', {})
-            rivers_edge_page['last_updated'] = datetime.now().isoformat()
+        # Initialize race object if needed
+        if 'race' not in kb:
+            kb['race'] = {}
+
+        old_content = kb.get('race_overview', {}).get('content', '')
+        new_content = scraped_data['rivers_edge_content']
+
+        if old_content != new_content:
+            if 'race_overview' not in kb:
+                kb['race_overview'] = {}
+            kb['race_overview']['content'] = new_content
+            kb['race_overview']['sections'] = scraped_data.get('rivers_edge_sections', {})
+            kb['race_overview']['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated River's Edge page content ({len(scraped_data['rivers_edge_content'])} chars)")
+            print(f"✓ Updated River's Edge race overview ({len(new_content)} chars)")
 
     # Update Policies page content
     if 'policies_content' in scraped_data:
-        policies_page = source_pages.setdefault('policies', {})
-        if (
-            policies_page.get('content') != scraped_data['policies_content']
-            or policies_page.get('sections') != scraped_data.get('policies_sections', {})
-        ):
-            policies_page['url'] = POLICIES_URL
-            policies_page['content'] = scraped_data['policies_content']
-            policies_page['sections'] = scraped_data.get('policies_sections', {})
-            policies_page['last_updated'] = datetime.now().isoformat()
+        # Initialize policies object if needed
+        if 'policies' not in kb:
+            kb['policies'] = {}
+
+        old_content = kb['policies'].get('content', '')
+        new_content = scraped_data['policies_content']
+
+        if old_content != new_content:
+            kb['policies']['content'] = new_content
+            kb['policies']['sections'] = scraped_data.get('policies_sections', {})
+            kb['policies']['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated policies page content ({len(scraped_data['policies_content'])} chars)")
+            print(f"✓ Updated policies ({len(new_content)} chars)")
 
     # Update About page content
     if 'about_content' in scraped_data:
-        about_page = source_pages.setdefault('about', {})
-        if (
-            about_page.get('content') != scraped_data['about_content']
-            or about_page.get('sections') != scraped_data.get('about_sections', {})
-        ):
-            about_page['url'] = ABOUT_URL
-            about_page['content'] = scraped_data['about_content']
-            about_page['sections'] = scraped_data.get('about_sections', {})
-            about_page['last_updated'] = datetime.now().isoformat()
+        # Initialize about object if needed
+        if 'about' not in kb:
+            kb['about'] = {}
+
+        old_content = kb['about'].get('content', '')
+        new_content = scraped_data['about_content']
+
+        if old_content != new_content:
+            kb['about']['content'] = new_content
+            kb['about']['sections'] = scraped_data.get('about_sections', {})
+            kb['about']['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated about page content ({len(scraped_data['about_content'])} chars)")
+            print(f"✓ Updated about ({len(new_content)} chars)")
 
     # Update Aid Stations page content
     if 'aid_stations_content' in scraped_data:
-        aid_page = source_pages.setdefault('aid_stations', {})
-        if (
-            aid_page.get('content') != scraped_data['aid_stations_content']
-            or aid_page.get('sections') != scraped_data.get('aid_stations_sections', {})
-        ):
-            aid_page['url'] = AID_STATION_URL
-            aid_page['content'] = scraped_data['aid_stations_content']
-            aid_page['sections'] = scraped_data.get('aid_stations_sections', {})
-            aid_page['last_updated'] = datetime.now().isoformat()
+        # Initialize aid_stations object if needed
+        if 'aid_stations' not in kb:
+            kb['aid_stations'] = {}
+
+        old_content = kb['aid_stations'].get('content', '')
+        new_content = scraped_data['aid_stations_content']
+
+        if old_content != new_content:
+            kb['aid_stations']['content'] = new_content
+            kb['aid_stations']['sections'] = scraped_data.get('aid_stations_sections', {})
+            kb['aid_stations']['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated aid stations page content ({len(scraped_data['aid_stations_content'])} chars)")
+            print(f"✓ Updated aid stations ({len(new_content)} chars)")
 
     # Add last updated timestamp
     kb['_lastUpdated'] = datetime.now().isoformat()
