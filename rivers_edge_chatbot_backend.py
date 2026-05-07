@@ -114,18 +114,28 @@ def manual_scrape():
     """Manually trigger the scraper"""
     try:
         logger.info("Manual scrape requested")
+        print("\n" + "="*60)
+        print("MANUAL SCRAPE TRIGGERED")
+        print("="*60)
         from rivers_edge_website_scraper import main
         success = main()
+        result = 'success' if success else 'failed'
+        logger.info(f"Scrape completed with status: {result}")
         return jsonify({
-            'status': 'success' if success else 'failed',
-            'message': 'Scraper executed',
+            'status': result,
+            'message': 'Scraper executed - check Render logs for details',
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
         logger.error(f"Scrape error: {str(e)}")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(error_trace)
+        print(f"SCRAPE ERROR: {error_trace}")
         return jsonify({
             'status': 'error',
             'message': str(e),
+            'error_trace': error_trace,
             'timestamp': datetime.now().isoformat()
         }), 500
 

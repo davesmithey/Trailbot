@@ -320,51 +320,71 @@ def main():
 
     # Fetch and parse race page
     print(f"Fetching {WEBSITE_URL}...")
-    html = fetch_url(WEBSITE_URL)
-    if html:
-        print("✓ Race page fetched")
-        print("\nParsing race page content...")
-        race_data = parse_website(html)
-        scraped_data.update(race_data)
-        print("✓ Race page parsed")
-    else:
-        print("⚠ Failed to fetch race page (continuing)")
+    try:
+        html = fetch_url(WEBSITE_URL)
+        if html:
+            print("✓ Race page fetched")
+            print("\nParsing race page content...")
+            race_data = parse_website(html)
+            scraped_data.update(race_data)
+            print("✓ Race page parsed")
+        else:
+            print("⚠ Failed to fetch race page (continuing)")
+    except Exception as e:
+        print(f"❌ ERROR fetching race page: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Fetch and parse policies
     print(f"\nFetching {POLICIES_URL}...")
-    policies_html = fetch_url(POLICIES_URL)
-    if policies_html:
-        print("✓ Policies page fetched")
-        print("\nParsing policies...")
-        policies_data = parse_policies(policies_html)
-        scraped_data.update(policies_data)
-        print("✓ Policies parsed")
-    else:
-        print("⚠ Failed to fetch policies page (continuing)")
+    try:
+        policies_html = fetch_url(POLICIES_URL)
+        if policies_html:
+            print("✓ Policies page fetched")
+            print("\nParsing policies...")
+            policies_data = parse_policies(policies_html)
+            scraped_data.update(policies_data)
+            print("✓ Policies parsed")
+        else:
+            print("⚠ Failed to fetch policies page (continuing)")
+    except Exception as e:
+        print(f"❌ ERROR fetching policies: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Fetch and parse about page
     print(f"\nFetching {ABOUT_URL}...")
-    about_html = fetch_url(ABOUT_URL)
-    if about_html:
-        print("✓ About page fetched")
-        print("\nParsing about section...")
-        about_data = parse_about(about_html)
-        scraped_data.update(about_data)
-        print("✓ About section parsed")
-    else:
-        print("⚠ Failed to fetch about page (continuing)")
+    try:
+        about_html = fetch_url(ABOUT_URL)
+        if about_html:
+            print("✓ About page fetched")
+            print("\nParsing about section...")
+            about_data = parse_about(about_html)
+            scraped_data.update(about_data)
+            print("✓ About section parsed")
+        else:
+            print("⚠ Failed to fetch about page (continuing)")
+    except Exception as e:
+        print(f"❌ ERROR fetching about: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Fetch and parse aid station info
     print(f"\nFetching {AID_STATION_URL}...")
-    aid_html = fetch_url(AID_STATION_URL)
-    if aid_html:
-        print("✓ Aid station info page fetched")
-        print("\nParsing aid station information...")
-        aid_data = parse_aid_stations(aid_html)
-        scraped_data.update(aid_data)
-        print("✓ Aid station info parsed")
-    else:
-        print("⚠ Failed to fetch aid station info (continuing)")
+    try:
+        aid_html = fetch_url(AID_STATION_URL)
+        if aid_html:
+            print("✓ Aid station info page fetched")
+            print("\nParsing aid station information...")
+            aid_data = parse_aid_stations(aid_html)
+            scraped_data.update(aid_data)
+            print("✓ Aid station info parsed")
+        else:
+            print("⚠ Failed to fetch aid station info (continuing)")
+    except Exception as e:
+        print(f"❌ ERROR fetching aid stations: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Load current knowledge base
     print("\nLoading knowledge base...")
