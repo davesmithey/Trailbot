@@ -5,13 +5,13 @@ Automatically extracts race information from tejastrails.com/edge and related pa
 Pulls from: race page, policies, about page, and aid-station-info
 Updates knowledge base JSON on a scheduled basis.
 """
-
 import requests
 from bs4 import BeautifulSoup
 import json
 import os
 import base64
 from datetime import datetime
+import re
 
 # Configuration
 WEBSITE_URL = "https://www.tejastrails.com/edge"
@@ -21,6 +21,98 @@ AID_STATION_URL = "https://www.tejastrails.com/aid-station-info"
 KB_FILE = "rivers_edge_knowledge_base.json"
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 GITHUB_REPO = os.environ.get('GITHUB_REPO', 'davesmithey/Trailbot')
+
+CONTENT_TAGS = ['h1', 'h2', 'h3', 'h4', 'p', 'li']
+
+def clean_text(text):
+    """Normalize webpage text without smashing words together."""
+    if not text:
+        return ''
+    text = text.replace('\xa0', ' ')
+    return re.sub(r'\s+', ' ', text).strip()
+
+def extract_main_content(soup):
+    """Find the page content area, falling back to the body if needed."""
+    return (
+        soup.find('main')
+        or soup.find('article')
+        or soup.find('div', class_='content')
+        or soup.body
+        or soup
+    )
+
+def extract_page_text(soup):
+    """Extract readable page text from headings, paragraphs, and list items."""
+    content = extract_main_content(soup)
+    text_blocks = []
+    for element in content.find_all(CONTENT_TAGS):
+        text = clean_text(element.get_text(' ', strip=True))
+        if not text:
+            continue
+        # Squarespace pages repeat large navigation menus. Keep only useful page
+        # content and drop tiny/common nav labels.
+        if text in {'Open Menu Close Menu', 'Back', 'Register Now', 'Store'}:
+            continue
+        if len(text) < 3:
+            continue
+        if not text_blocks or text_blocks[-1] != text:
+            text_blocks.append(text)
+    return "\n".join(text_blocks), str(content)
+
+def extract_sections(page_text):
+    """Group full page text under headings so the chatbot can find details."""
+    sections = {}
+    current_heading = 'Overview'
+    current_lines = []
+    for line in page_text.splitlines():
+        line = clean_text(line)
+        if not line:
+            continue
+        if line.endswith('▼'):
+            line = line[:-1].strip()
+        is_heading = (
+            len(line) <= 90
+            and not line.endswith('.')
+            and (
+                line.isupper()
+                or line.startswith('...')
+                or line.startswith('…')
+                or line.lower() in {
+                    'race schedule',
+                    'course information',
+                    'aid stations',
+                    'drop bags',
+                    'swag & stuff',
+                    'rules',
+                    'pacers',
+                    'awards',
+                    'family-friendly',
+                    'getting here',
+                    'lodging',
+                    'history',
+                    'questions',
+                    'volunteering',
+                    'results',
+                    'timing',
+                    'overall awards',
+                    'age group awards',
+                    'about',
+                    'about tejas trails',
+                    'river\'s edge',
+                }
+            )
+        )
+        if is_heading and current_lines:
+            sections[current_heading] = "\n".join(current_lines).strip()
+            current_heading = line
+            current_lines = []
+        elif is_heading:
+            current_heading = line
+        else:
+            current_lines.append(line)
+    if current_lines:
+        sections[current_heading] = "\n".join(current_lines).strip()
+    return sections
 
 def fetch_url(url):
     """Fetch a webpage"""
@@ -35,127 +127,19 @@ def fetch_url(url):
         print(f"Error fetching {url}: {e}")
         return None
 
-def parse_website(html):
-    """Parse River's Edge race page and extract race information"""
+def parse_website(html, url_name="race"):
+    """Parse website HTML and extract full page content"""
     soup = BeautifulSoup(html, 'html.parser')
     data = {}
 
-    # Extract race distances
-    distances_section = soup.find(string=lambda s: s and "Races:" in s)
-    if distances_section:
-        distances_text = distances_section.strip()
-        if ":" in distances_text:
-            distances_str = distances_text.split(":", 1)[1].strip()
-            distances = [d.strip() for d in distances_str.split(",")]
-            distances = [d for d in distances if d]
-            data['distances'] = distances
-            print(f"✓ Found {len(distances)} distances")
-
-    # Extract when/date
-    when_section = soup.find(string=lambda s: s and "When:" in s)
-    if when_section:
-        when_text = when_section.strip()
-        if ":" in when_text:
-            date_str = when_text.split(":", 1)[1].strip()
-            data['date'] = date_str
-            print(f"✓ Found date: {date_str}")
-
-    # Extract where/venue
-    where_section = soup.find(string=lambda s: s and "Where:" in s)
-    if where_section:
-        where_text = where_section.strip()
-        if ":" in where_text:
-            venue_str = where_text.split(":", 1)[1].strip()
-            data['venue_text'] = venue_str
-            print(f"✓ Found venue: {venue_str}")
-
-    # Try to extract venue link
-    for link in soup.find_all('a'):
-        link_text = link.get_text()
-        if link_text and any(venue in link_text for venue in ['Ranch', 'Park', 'Trail']):
-            data['venue_name'] = link_text.strip()
-            print(f"✓ Found venue: {link_text.strip()}")
-            break
+    page_text, raw_html = extract_page_text(soup)
+    if page_text:
+        data[f'{url_name}_content'] = page_text
+        data[f'{url_name}_sections'] = extract_sections(page_text)
+        data[f'{url_name}_raw_html'] = raw_html
+        print(f"✓ Found {url_name} page content ({len(page_text)} chars)")
 
     return data
-
-def parse_policies(html):
-    """Parse policies page and extract policy information"""
-    soup = BeautifulSoup(html, 'html.parser')
-    policies_text = []
-
-    # Try to find the main content area
-    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
-    if main_content:
-        for element in main_content.find_all(['h2', 'h3', 'p']):
-            text = element.get_text(strip=True)
-            if text:
-                policies_text.append(text)
-
-    # If no main content found, try extracting from body
-    if not policies_text:
-        for element in soup.find_all(['h2', 'h3', 'p']):
-            text = element.get_text(strip=True)
-            if text and len(text) > 10:
-                policies_text.append(text)
-
-    policies_content = "\n".join(policies_text)
-    return {
-        'policies_content': policies_content,
-        'policies_raw_html': str(main_content) if main_content else None
-    }
-
-def parse_about(html):
-    """Parse about page and extract company/race information"""
-    soup = BeautifulSoup(html, 'html.parser')
-    about_text = []
-
-    # Try to find the main content area
-    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
-    if main_content:
-        for element in main_content.find_all(['h2', 'h3', 'p']):
-            text = element.get_text(strip=True)
-            if text:
-                about_text.append(text)
-
-    # If no main content found, try extracting from body
-    if not about_text:
-        for element in soup.find_all(['h2', 'h3', 'p']):
-            text = element.get_text(strip=True)
-            if text and len(text) > 10:
-                about_text.append(text)
-
-    about_content = "\n".join(about_text)
-    return {
-        'about_content': about_content,
-        'about_raw_html': str(main_content) if main_content else None
-    }
-
-def parse_aid_stations(html):
-    """Parse aid station information page"""
-    soup = BeautifulSoup(html, 'html.parser')
-    aid_text = []
-
-    # Try to find the main content area
-    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
-    if main_content:
-        for element in main_content.find_all(['h2', 'h3', 'p', 'li']):
-            text = element.get_text(strip=True)
-            if text:
-                aid_text.append(text)
-
-    # If no main content found, try extracting from body
-    if not aid_text:
-        for element in soup.find_all(['h2', 'h3', 'p', 'li']):
-            text = element.get_text(strip=True)
-            if text and len(text) > 5:
-                aid_text.append(text)
-
-    aid_content = "\n".join(aid_text)
-    return {
-        'aid_stations_content': aid_content,
-        'aid_stations_raw_html': str(main_content) if main_content else None
-    }
 
 def load_knowledge_base():
     """Load current knowledge base JSON"""
@@ -176,77 +160,64 @@ def update_knowledge_base(kb, scraped_data):
 
     changes_made = False
 
-    # Update distances
-    if 'distances' in scraped_data:
-        if 'race' not in kb:
-            kb['race'] = {}
-        old_distances = kb['race'].get('distances', [])
-        new_distances = scraped_data['distances']
-        if old_distances != new_distances:
-            kb['race']['distances'] = new_distances
-            changes_made = True
-            print(f"✓ Updated distances ({len(new_distances)} items)")
+    # Store full source pages so the chatbot can answer detailed questions
+    source_pages = kb.setdefault('source_pages', {})
 
-    # Update date
-    if 'date' in scraped_data:
-        if 'race' not in kb:
-            kb['race'] = {}
-        old_date = kb['race'].get('date')
-        new_date = scraped_data['date']
-        if old_date != new_date:
-            kb['race']['date'] = new_date
+    # Update River's Edge page content
+    if 'rivers_edge_content' in scraped_data:
+        rivers_edge_page = source_pages.setdefault('rivers_edge', {})
+        if (
+            rivers_edge_page.get('content') != scraped_data['rivers_edge_content']
+            or rivers_edge_page.get('sections') != scraped_data.get('rivers_edge_sections', {})
+        ):
+            rivers_edge_page['url'] = WEBSITE_URL
+            rivers_edge_page['content'] = scraped_data['rivers_edge_content']
+            rivers_edge_page['sections'] = scraped_data.get('rivers_edge_sections', {})
+            rivers_edge_page['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated date: {new_date}")
+            print(f"✓ Updated River's Edge page content ({len(scraped_data['rivers_edge_content'])} chars)")
 
-    # Update venue
-    if 'venue_name' in scraped_data:
-        if 'race' not in kb:
-            kb['race'] = {}
-        if 'location' not in kb['race']:
-            kb['race']['location'] = {}
-        location_data = kb['race']['location']
-        old_venue = location_data.get('venue')
-        new_venue = scraped_data.get('venue_name')
-        if old_venue != new_venue:
-            location_data['venue'] = new_venue
-            changes_made = True
-            print(f"✓ Updated venue: {new_venue}")
-
-    # Update policies
+    # Update Policies page content
     if 'policies_content' in scraped_data:
-        old_policies = kb.get('policies', {}).get('content', '')
-        new_policies = scraped_data['policies_content']
-        if old_policies != new_policies and new_policies:
-            if 'policies' not in kb:
-                kb['policies'] = {}
-            kb['policies']['content'] = new_policies
-            kb['policies']['last_updated'] = datetime.now().isoformat()
+        policies_page = source_pages.setdefault('policies', {})
+        if (
+            policies_page.get('content') != scraped_data['policies_content']
+            or policies_page.get('sections') != scraped_data.get('policies_sections', {})
+        ):
+            policies_page['url'] = POLICIES_URL
+            policies_page['content'] = scraped_data['policies_content']
+            policies_page['sections'] = scraped_data.get('policies_sections', {})
+            policies_page['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated policies ({len(new_policies)} chars)")
+            print(f"✓ Updated policies page content ({len(scraped_data['policies_content'])} chars)")
 
-    # Update about
+    # Update About page content
     if 'about_content' in scraped_data:
-        old_about = kb.get('about', {}).get('content', '')
-        new_about = scraped_data['about_content']
-        if old_about != new_about and new_about:
-            if 'about' not in kb:
-                kb['about'] = {}
-            kb['about']['content'] = new_about
-            kb['about']['last_updated'] = datetime.now().isoformat()
+        about_page = source_pages.setdefault('about', {})
+        if (
+            about_page.get('content') != scraped_data['about_content']
+            or about_page.get('sections') != scraped_data.get('about_sections', {})
+        ):
+            about_page['url'] = ABOUT_URL
+            about_page['content'] = scraped_data['about_content']
+            about_page['sections'] = scraped_data.get('about_sections', {})
+            about_page['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated about section ({len(new_about)} chars)")
+            print(f"✓ Updated about page content ({len(scraped_data['about_content'])} chars)")
 
-    # Update aid stations
+    # Update Aid Stations page content
     if 'aid_stations_content' in scraped_data:
-        old_aid = kb.get('aid_stations', {}).get('content', '')
-        new_aid = scraped_data['aid_stations_content']
-        if old_aid != new_aid and new_aid:
-            if 'aid_stations' not in kb:
-                kb['aid_stations'] = {}
-            kb['aid_stations']['content'] = new_aid
-            kb['aid_stations']['last_updated'] = datetime.now().isoformat()
+        aid_page = source_pages.setdefault('aid_stations', {})
+        if (
+            aid_page.get('content') != scraped_data['aid_stations_content']
+            or aid_page.get('sections') != scraped_data.get('aid_stations_sections', {})
+        ):
+            aid_page['url'] = AID_STATION_URL
+            aid_page['content'] = scraped_data['aid_stations_content']
+            aid_page['sections'] = scraped_data.get('aid_stations_sections', {})
+            aid_page['last_updated'] = datetime.now().isoformat()
             changes_made = True
-            print(f"✓ Updated aid stations ({len(new_aid)} chars)")
+            print(f"✓ Updated aid stations page content ({len(scraped_data['aid_stations_content'])} chars)")
 
     # Add last updated timestamp
     kb['_lastUpdated'] = datetime.now().isoformat()
@@ -267,8 +238,8 @@ def save_knowledge_base(kb):
 def commit_to_github(kb):
     """Commit updated knowledge base to GitHub"""
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        print("Warning: GitHub credentials not configured")
-        return False
+        print("Warning: GitHub credentials not configured; skipping remote commit")
+        return None
 
     try:
         file_content = json.dumps(kb, indent=2)
@@ -320,71 +291,51 @@ def main():
 
     # Fetch and parse race page
     print(f"Fetching {WEBSITE_URL}...")
-    try:
-        html = fetch_url(WEBSITE_URL)
-        if html:
-            print("✓ Race page fetched")
-            print("\nParsing race page content...")
-            race_data = parse_website(html)
-            scraped_data.update(race_data)
-            print("✓ Race page parsed")
-        else:
-            print("⚠ Failed to fetch race page (continuing)")
-    except Exception as e:
-        print(f"❌ ERROR fetching race page: {e}")
-        import traceback
-        traceback.print_exc()
+    html = fetch_url(WEBSITE_URL)
+    if html:
+        print("✓ Race page fetched")
+        print("\nParsing race page content...")
+        race_data = parse_website(html, "rivers_edge")
+        scraped_data.update(race_data)
+        print("✓ Race page parsed")
+    else:
+        print("⚠ Failed to fetch race page (continuing)")
 
-    # Fetch and parse policies
+    # Fetch and parse policies page
     print(f"\nFetching {POLICIES_URL}...")
-    try:
-        policies_html = fetch_url(POLICIES_URL)
-        if policies_html:
-            print("✓ Policies page fetched")
-            print("\nParsing policies...")
-            policies_data = parse_policies(policies_html)
-            scraped_data.update(policies_data)
-            print("✓ Policies parsed")
-        else:
-            print("⚠ Failed to fetch policies page (continuing)")
-    except Exception as e:
-        print(f"❌ ERROR fetching policies: {e}")
-        import traceback
-        traceback.print_exc()
+    policies_html = fetch_url(POLICIES_URL)
+    if policies_html:
+        print("✓ Policies page fetched")
+        print("\nParsing policies...")
+        policies_data = parse_website(policies_html, "policies")
+        scraped_data.update(policies_data)
+        print("✓ Policies parsed")
+    else:
+        print("⚠ Failed to fetch policies page (continuing)")
 
     # Fetch and parse about page
     print(f"\nFetching {ABOUT_URL}...")
-    try:
-        about_html = fetch_url(ABOUT_URL)
-        if about_html:
-            print("✓ About page fetched")
-            print("\nParsing about section...")
-            about_data = parse_about(about_html)
-            scraped_data.update(about_data)
-            print("✓ About section parsed")
-        else:
-            print("⚠ Failed to fetch about page (continuing)")
-    except Exception as e:
-        print(f"❌ ERROR fetching about: {e}")
-        import traceback
-        traceback.print_exc()
+    about_html = fetch_url(ABOUT_URL)
+    if about_html:
+        print("✓ About page fetched")
+        print("\nParsing about section...")
+        about_data = parse_website(about_html, "about")
+        scraped_data.update(about_data)
+        print("✓ About section parsed")
+    else:
+        print("⚠ Failed to fetch about page (continuing)")
 
     # Fetch and parse aid station info
     print(f"\nFetching {AID_STATION_URL}...")
-    try:
-        aid_html = fetch_url(AID_STATION_URL)
-        if aid_html:
-            print("✓ Aid station info page fetched")
-            print("\nParsing aid station information...")
-            aid_data = parse_aid_stations(aid_html)
-            scraped_data.update(aid_data)
-            print("✓ Aid station info parsed")
-        else:
-            print("⚠ Failed to fetch aid station info (continuing)")
-    except Exception as e:
-        print(f"❌ ERROR fetching aid stations: {e}")
-        import traceback
-        traceback.print_exc()
+    aid_html = fetch_url(AID_STATION_URL)
+    if aid_html:
+        print("✓ Aid station info page fetched")
+        print("\nParsing aid station information...")
+        aid_data = parse_website(aid_html, "aid_stations")
+        scraped_data.update(aid_data)
+        print("✓ Aid station info parsed")
+    else:
+        print("⚠ Failed to fetch aid station info (continuing)")
 
     # Load current knowledge base
     print("\nLoading knowledge base...")
@@ -410,12 +361,16 @@ def main():
 
     # Commit to GitHub
     print("\nCommitting to GitHub...")
-    if not commit_to_github(kb):
+    github_result = commit_to_github(kb)
+    if github_result is False:
         print("✗ Failed to commit to GitHub")
         return False
 
     print("\n" + "="*60)
-    print("  ✓ SCRAPE COMPLETE - RENDER REDEPLOY TRIGGERED")
+    if github_result is None:
+        print("  ✓ SCRAPE COMPLETE - LOCAL KNOWLEDGE BASE UPDATED")
+    else:
+        print("  ✓ SCRAPE COMPLETE - RENDER REDEPLOY TRIGGERED")
     print("="*60 + "\n")
 
     return True
