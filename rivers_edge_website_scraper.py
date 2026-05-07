@@ -115,53 +115,54 @@ def extract_sections(page_text):
     return sections
 
 def extract_distances(page_text):
-    """Extract race distances from page text (e.g., '50 mi', '26.2 mi')"""
+    """Extract race distances from page text (e.g., '50k', '50 mi', '26.2 mi')"""
     distances = []
-    # Look for patterns like "50 mi", "26.2 miles", "50-mile", etc.
-    patterns = [
-        r'(\d+\.?\d*)\s*(?:mi|mile|miles)',
-        r'(\d+\.?\d*)\s*(?:km|kilometer|kilometers)',
-    ]
 
-    found_distances = set()
-    for pattern in patterns:
-        matches = re.finditer(pattern, page_text, re.IGNORECASE)
-        for match in matches:
-            distance_str = match.group(0).strip()
-            if distance_str not in found_distances:
-                distances.append(distance_str)
-                found_distances.add(distance_str)
+    # First try to find the "Races:" section and extract all distances from that line
+    races_match = re.search(r'Races:\s*(.+?)(?:\n|When:|Where:|$)', page_text, re.IGNORECASE | re.DOTALL)
+    if races_match:
+        races_text = races_match.group(1)
+        # Extract all distance patterns: "50k", "25k", "10 mi", "5 mi", etc.
+        distance_patterns = [
+            r'(\d+(?:k|km|mi|mile|miles))',  # Catch 50k, 25k, 10 mi, etc.
+        ]
+
+        for pattern in distance_patterns:
+            matches = re.finditer(pattern, races_text, re.IGNORECASE)
+            for match in matches:
+                distance_str = match.group(0).strip()
+                if distance_str not in distances:
+                    distances.append(distance_str)
 
     return distances
 
 def extract_race_date(page_text):
     """Extract race date from page text"""
-    # Look for patterns like "May 15", "May 15-16", "May 15-16, 2026"
-    date_patterns = [
+    # Look for "When: May 23, 2026" or similar patterns
+    when_patterns = [
+        r'When:\s*(.+?)(?:\n|Where:|$)',  # Capture text after "When:"
         r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:,?\s*\d{4})?',
     ]
 
-    for pattern in date_patterns:
+    for pattern in when_patterns:
         match = re.search(pattern, page_text, re.IGNORECASE)
         if match:
-            return match.group(0).strip()
+            date_str = match.group(1).strip() if match.lastindex and match.lastindex >= 1 else match.group(0).strip()
+            return date_str
 
     return None
 
 def extract_venue_info(page_text):
     """Extract venue name and location from page text"""
-    # Look for common venue indicators
-    venue_patterns = [
-        r'(?:at|venue|located at|park|state park)\s+([A-Z][A-Za-z\s]+(?:Park|Ranch|Trail|Trail Run))',
-        r'([A-Z][A-Za-z\s]+(?:Park|Ranch|Trail|Trail Run))\s*(?:,?\s+(?:near|in|at)\s+)?([A-Za-z\s]+,?\s*(?:TX|Texas))?',
-    ]
-
-    for pattern in venue_patterns:
-        match = re.search(pattern, page_text)
-        if match:
-            venue_name = match.group(1).strip() if match.group(1) else None
-            if venue_name:
-                return venue_name
+    # Look for "Where: Katy Trailhead at San Gabriel Park..."
+    where_match = re.search(r'Where:\s*(.+?)(?:\n|$)', page_text, re.IGNORECASE | re.DOTALL)
+    if where_match:
+        location_text = where_match.group(1).strip()
+        # Extract just the venue/trailhead name (first part before the address)
+        # E.g., "Katy Trailhead at San Gabriel Park" from "Katy Trailhead at San Gabriel Park. 1100 North College Street..."
+        venue_match = re.match(r'^([A-Za-z\s]+(?:Trailhead|Park|Ranch|Trail|Trail Run))', location_text)
+        if venue_match:
+            return venue_match.group(1).strip()
 
     return None
 
