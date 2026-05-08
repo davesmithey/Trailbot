@@ -1,75 +1,464 @@
 #!/usr/bin/env python3
 """
-Fix River's Edge scraper on GitHub by updating with corrected indentation.
-Run this script with your GitHub token as an argument.
+River's Edge Trail Race Website Scraper
+Automatically extracts race information from tejastrails.com/edge and related pages
+Pulls from: race page, policies, about page, and aid-station-info
+Updates knowledge base JSON on a scheduled basis.
 """
 import requests
+from bs4 import BeautifulSoup
+import json
+import os
 import base64
-import sys
-from pathlib import Path
+from datetime import datetime
+import re
 
-def fix_scraper():
-    # Get GitHub token from environment or command line
-    token = None
-    if len(sys.argv) > 1:
-        token = sys.argv[1]
+# Configuration
+WEBSITE_URL = "https://www.tejastrails.com/edge"
+POLICIES_URL = "https://www.tejastrails.com/policies"
+ABOUT_URL = "https://www.tejastrails.com/about"
+AID_STATION_URL = "https://www.tejastrails.com/aid-station-info"
+KB_FILE = "rivers_edge_knowledge_base.json"
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+GITHUB_REPO = os.environ.get('GITHUB_REPO', 'davesmithey/Trailbot')
+
+CONTENT_TAGS = ['h1', 'h2', 'h3', 'h4', 'p', 'li']
+
+def clean_text(text):
+    """Normalize webpage text without smashing words together."""
+    if not text:
+        return ''
+    text = text.replace('\xa0', ' ')
+    return re.sub(r'\s+', ' ', text).strip()
+
+def extract_main_content(soup):
+    """Find the page content area, falling back to the body if needed."""
+    return (
+        soup.find('main')
+        or soup.find('article')
+        or soup.find('div', class_='content')
+        or soup.body
+        or soup
+    )
+
+def extract_page_text(soup):
+    """Extract readable page text from headings, paragraphs, and list items."""
+    content = extract_main_content(soup)
+    text_blocks = []
+    for element in content.find_all(CONTENT_TAGS):
+        text = clean_text(element.get_text(' ', strip=True))
+        if not text:
+            continue
+        # Squarespace pages repeat large navigation menus. Keep only useful page
+        # content and drop tiny/common nav labels.
+        if text in {'Open Menu Close Menu', 'Back', 'Register Now', 'Store'}:
+            continue
+        if len(text) < 3:
+            continue
+        if not text_blocks or text_blocks[-1] != text:
+            text_blocks.append(text)
+    return "\n".join(text_blocks), str(content)
+
+def extract_sections(page_text):
+    """Group full page text under headings so the chatbot can find details."""
+    sections = {}
+    current_heading = 'Overview'
+    current_lines = []
+    for line in page_text.splitlines():
+        line = clean_text(line)
+        if not line:
+            continue
+        if line.endswith('▼'):
+            line = line[:-1].strip()
+        is_heading = (
+            len(line) <= 90
+            and not line.endswith('.')
+            and (
+                line.isupper()
+                or line.startswith('...')
+                or line.startswith('…')
+                or line.lower() in {
+                    'race schedule',
+                    'course information',
+                    'aid stations',
+                    'drop bags',
+                    'swag & stuff',
+                    'rules',
+                    'pacers',
+                    'awards',
+                    'family-friendly',
+                    'getting here',
+                    'lodging',
+                    'history',
+                    'questions',
+                    'volunteering',
+                    'results',
+                    'timing',
+                    'overall awards',
+                    'age group awards',
+                    'about',
+                    'about tejas trails',
+                    'river\'s edge',
+                }
+            )
+        )
+        if is_heading and current_lines:
+            sections[current_heading] = "\n".join(current_lines).strip()
+            current_heading = line
+            current_lines = []
+        elif is_heading:
+            current_heading = line
+        else:
+            current_lines.append(line)
+    if current_lines:
+        sections[current_heading] = "\n".join(current_lines).strip()
+    return sections
+
+def extract_distances(page_text):
+    """Extract race distances from page text (e.g., '50k', '50 mi', '26.2 mi')"""
+    distances = []
+
+    # First try to find the "Races:" section and extract all distances from that line
+    races_match = re.search(r'Races:\s*(.+?)(?:\n|When:|Where:|$)', page_text, re.IGNORECASE | re.DOTALL)
+    if races_match:
+        races_text = races_match.group(1)
+        # Extract all distance patterns: "50k", "25k", "10 mi", "5 mi", etc.
+        distance_patterns = [
+            r'(\d+(?:k|km|mi|mile|miles))',  # Catch 50k, 25k, 10 mi, etc.
+        ]
+
+        for pattern in distance_patterns:
+            matches = re.finditer(pattern, races_text, re.IGNORECASE)
+            for match in matches:
+                distance_str = match.group(0).strip()
+                if distance_str not in distances:
+                    distances.append(distance_str)
+
+    return distances
+
+def extract_race_date(page_text):
+    """Extract race date from page text"""
+    # Look for "When: May 23, 2026" or similar patterns
+    when_patterns = [
+        r'When:\s*(.+?)(?:\n|Where:|$)',  # Capture text after "When:"
+        r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:,?\s*\d{4})?',
+    ]
+
+    for pattern in when_patterns:
+        match = re.search(pattern, page_text, re.IGNORECASE)
+        if match:
+            date_str = match.group(1).strip() if match.lastindex and match.lastindex >= 1 else match.group(0).strip()
+            return date_str
+
+    return None
+
+def extract_venue_info(page_text):
+    """Extract venue name and location from page text"""
+    # Look for "Where: Katy Trailhead at San Gabriel Park..."
+    where_match = re.search(r'Where:\s*(.+?)(?:\n|$)', page_text, re.IGNORECASE | re.DOTALL)
+    if where_match:
+        location_text = where_match.group(1).strip()
+        # Extract just the venue/trailhead name (first part before the address)
+        # E.g., "Katy Trailhead at San Gabriel Park" from "Katy Trailhead at San Gabriel Park. 1100 North College Street..."
+        venue_match = re.match(r'^([A-Za-z\s]+(?:Trailhead|Park|Ranch|Trail|Trail Run))', location_text)
+        if venue_match:
+            return venue_match.group(1).strip()
+
+    return None
+
+def fetch_url(url):
+    """Fetch a webpage"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        print(f"Error fetching {url}: {e}")
+        return None
+
+def parse_website(html, url_name="race"):
+    """Parse website HTML and extract full page content"""
+    soup = BeautifulSoup(html, 'html.parser')
+    data = {}
+
+    page_text, raw_html = extract_page_text(soup)
+    if page_text:
+        data[f'{url_name}_content'] = page_text
+        data[f'{url_name}_sections'] = extract_sections(page_text)
+        data[f'{url_name}_raw_html'] = raw_html
+        print(f"✓ Found {url_name} page content ({len(page_text)} chars)")
+
+    return data
+
+def load_knowledge_base():
+    """Load current knowledge base JSON"""
+    try:
+        with open(KB_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: {KB_FILE} not found, starting fresh")
+        return {}
+    except json.JSONDecodeError:
+        print(f"Warning: {KB_FILE} is not valid JSON")
+        return {}
+
+def update_knowledge_base(kb, scraped_data):
+    """Update knowledge base with scraped data"""
+    if not scraped_data:
+        return kb, False
+
+    changes_made = False
+
+    # Initialize race object if needed
+    if 'race' not in kb:
+        kb['race'] = {}
+    if 'race_overview' not in kb:
+        kb['race_overview'] = {}
+
+    # Update River's Edge page content (race overview) and extract specific fields
+    if 'rivers_edge_content' in scraped_data:
+        old_content = kb['race_overview'].get('content', '')
+        new_content = scraped_data['rivers_edge_content']
+
+        if old_content != new_content:
+            kb['race_overview']['content'] = new_content
+            kb['race_overview']['sections'] = scraped_data.get('rivers_edge_sections', {})
+            kb['race_overview']['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated River's Edge race overview ({len(new_content)} chars)")
+
+        # Extract specific fields from race page content (MOVED OUTSIDE if block)
+        # Extract distances
+        distances = extract_distances(new_content)
+        if distances and kb['race'].get('distances') != distances:
+            kb['race']['distances'] = distances
+            changes_made = True
+            print(f"✓ Extracted distances: {', '.join(distances)}")
+
+        # Extract race date
+        race_date = extract_race_date(new_content)
+        if race_date and kb['race'].get('date') != race_date:
+            kb['race']['date'] = race_date
+            changes_made = True
+            print(f"✓ Extracted race date: {race_date}")
+
+        # Extract venue
+        venue = extract_venue_info(new_content)
+        if venue:
+            if 'location' not in kb['race']:
+                kb['race']['location'] = {}
+            if kb['race']['location'].get('venue') != venue:
+                kb['race']['location']['venue'] = venue
+                changes_made = True
+                print(f"✓ Extracted venue: {venue}")
+
+    # Update Policies page content
+    if 'policies_content' in scraped_data:
+        # Initialize policies object if needed
+        if 'policies' not in kb:
+            kb['policies'] = {}
+
+        old_content = kb['policies'].get('content', '')
+        new_content = scraped_data['policies_content']
+
+        if old_content != new_content:
+            kb['policies']['content'] = new_content
+            kb['policies']['sections'] = scraped_data.get('policies_sections', {})
+            kb['policies']['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated policies ({len(new_content)} chars)")
+
+    # Update About page content
+    if 'about_content' in scraped_data:
+        # Initialize about object if needed
+        if 'about' not in kb:
+            kb['about'] = {}
+
+        old_content = kb['about'].get('content', '')
+        new_content = scraped_data['about_content']
+
+        if old_content != new_content:
+            kb['about']['content'] = new_content
+            kb['about']['sections'] = scraped_data.get('about_sections', {})
+            kb['about']['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated about ({len(new_content)} chars)")
+
+    # Update Aid Stations page content
+    if 'aid_stations_content' in scraped_data:
+        # Initialize aid_stations object if needed
+        if 'aid_stations' not in kb:
+            kb['aid_stations'] = {}
+
+        old_content = kb['aid_stations'].get('content', '')
+        new_content = scraped_data['aid_stations_content']
+
+        if old_content != new_content:
+            kb['aid_stations']['content'] = new_content
+            kb['aid_stations']['sections'] = scraped_data.get('aid_stations_sections', {})
+            kb['aid_stations']['last_updated'] = datetime.now().isoformat()
+            changes_made = True
+            print(f"✓ Updated aid stations ({len(new_content)} chars)")
+
+    # Add last updated timestamp
+    kb['_lastUpdated'] = datetime.now().isoformat()
+    kb['_source'] = 'Automated scraper from tejastrails.com/edge, /policies, /about, and /aid-station-info'
+
+    return kb, changes_made
+
+def save_knowledge_base(kb):
+    """Save knowledge base to JSON file"""
+    try:
+        with open(KB_FILE, 'w') as f:
+            json.dump(kb, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving knowledge base: {e}")
+        return False
+
+def commit_to_github(kb):
+    """Commit updated knowledge base to GitHub"""
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        print("Warning: GitHub credentials not configured; skipping remote commit")
+        return None
+
+    try:
+        file_content = json.dumps(kb, indent=2)
+        file_content_encoded = base64.b64encode(file_content.encode()).decode()
+
+        headers = {
+            'Authorization': f'token {GITHUB_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        file_url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{KB_FILE}'
+
+        get_response = requests.get(file_url, headers=headers)
+        if get_response.status_code == 200:
+            current_sha = get_response.json()['sha']
+        else:
+            current_sha = None
+
+        commit_payload = {
+            'message': f'[AUTO] Update River\'s Edge knowledge base from website scraper - {datetime.now().isoformat()}',
+            'content': file_content_encoded,
+            'branch': 'main'
+        }
+
+        if current_sha:
+            commit_payload['sha'] = current_sha
+
+        response = requests.put(file_url, json=commit_payload, headers=headers)
+
+        if response.status_code in [200, 201]:
+            print(f"✓ Committed to GitHub")
+            return True
+        else:
+            print(f"✗ GitHub commit failed: {response.status_code}")
+            print(f"  Response: {response.json()}")
+            return False
+    except Exception as e:
+        print(f"Error committing to GitHub: {e}")
+        return False
+
+def main():
+    """Main scraper workflow"""
+    print(f"\n{'='*60}")
+    print(f"  RIVER'S EDGE TRAIL RACE WEBSITE SCRAPER")
+    print(f"  {datetime.now().isoformat()}")
+    print(f"{'='*60}\n")
+
+    scraped_data = {}
+
+    # Fetch and parse race page
+    print(f"Fetching {WEBSITE_URL}...")
+    html = fetch_url(WEBSITE_URL)
+    if html:
+        print("✓ Race page fetched")
+        print("\nParsing race page content...")
+        race_data = parse_website(html, "rivers_edge")
+        scraped_data.update(race_data)
+        print("✓ Race page parsed")
     else:
-        token = input("Enter your GitHub token: ").strip()
+        print("⚠ Failed to fetch race page (continuing)")
 
-    if not token:
-        print("❌ GitHub token required")
+    # Fetch and parse policies page
+    print(f"\nFetching {POLICIES_URL}...")
+    policies_html = fetch_url(POLICIES_URL)
+    if policies_html:
+        print("✓ Policies page fetched")
+        print("\nParsing policies...")
+        policies_data = parse_website(policies_html, "policies")
+        scraped_data.update(policies_data)
+        print("✓ Policies parsed")
+    else:
+        print("⚠ Failed to fetch policies page (continuing)")
+
+    # Fetch and parse about page
+    print(f"\nFetching {ABOUT_URL}...")
+    about_html = fetch_url(ABOUT_URL)
+    if about_html:
+        print("✓ About page fetched")
+        print("\nParsing about section...")
+        about_data = parse_website(about_html, "about")
+        scraped_data.update(about_data)
+        print("✓ About section parsed")
+    else:
+        print("⚠ Failed to fetch about page (continuing)")
+
+    # Fetch and parse aid station info
+    print(f"\nFetching {AID_STATION_URL}...")
+    aid_html = fetch_url(AID_STATION_URL)
+    if aid_html:
+        print("✓ Aid station info page fetched")
+        print("\nParsing aid station information...")
+        aid_data = parse_website(aid_html, "aid_stations")
+        scraped_data.update(aid_data)
+        print("✓ Aid station info parsed")
+    else:
+        print("⚠ Failed to fetch aid station info (continuing)")
+
+    # Load current knowledge base
+    print("\nLoading knowledge base...")
+    kb = load_knowledge_base()
+    print("✓ Knowledge base loaded")
+
+    # Update with scraped data
+    print("\nUpdating knowledge base...")
+    kb, changes_made = update_knowledge_base(kb, scraped_data)
+
+    if not changes_made:
+        print("ℹ No changes detected")
+        return True
+
+    print("✓ Knowledge base updated")
+
+    # Save locally
+    print("\nSaving knowledge base...")
+    if not save_knowledge_base(kb):
+        print("✗ Failed to save knowledge base")
+        return False
+    print("✓ Knowledge base saved")
+
+    # Commit to GitHub
+    print("\nCommitting to GitHub...")
+    github_result = commit_to_github(kb)
+    if github_result is False:
+        print("✗ Failed to commit to GitHub")
         return False
 
-    # Read the corrected file
-    corrected_file = Path(__file__).parent / "rivers_edge_website_scraper_CORRECTED.py"
-    if not corrected_file.exists():
-        print(f"❌ Corrected file not found at {corrected_file}")
-        return False
+    print("\n" + "="*60)
+    if github_result is None:
+        print("  ✓ SCRAPE COMPLETE - LOCAL KNOWLEDGE BASE UPDATED")
+    else:
+        print("  ✓ SCRAPE COMPLETE - RENDER REDEPLOY TRIGGERED")
+    print("="*60 + "\n")
 
-    with open(corrected_file, 'r') as f:
-        content = f.read()
-
-    # Encode content
-    content_encoded = base64.b64encode(content.encode()).decode()
-
-    # GitHub API setup
-    headers = {
-        'Authorization': f'token {token}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
-    file_url = 'https://api.github.com/repos/davesmithey/Trailbot/contents/rivers_edge_website_scraper.py'
-
-    # Get current SHA
-    print("Fetching current file info...")
-    response = requests.get(file_url, headers=headers)
-    if response.status_code != 200:
-        print(f"❌ Failed to fetch file: {response.status_code}")
-        print(f"   Response: {response.json()}")
-        return False
-
-    current_sha = response.json()['sha']
-    print(f"✓ Got current SHA: {current_sha[:8]}...")
-
-    # Prepare commit
-    payload = {
-        'message': '[FIX] Move extraction code outside content-change conditional',
-        'content': content_encoded,
-        'sha': current_sha,
-        'branch': 'main'
-    }
-
-    # Commit
-    print("Committing fix to GitHub...")
-    response = requests.put(file_url, json=payload, headers=headers)
-
-    if response.status_code not in [200, 201]:
-        print(f"❌ Commit failed: {response.status_code}")
-        print(f"   Response: {response.json()}")
-        return False
-
-    print("✓ Fix committed to GitHub!")
     return True
 
 if __name__ == "__main__":
-    success = fix_scraper()
-    sys.exit(0 if success else 1)
+    success = main()
+    exit(0 if success else 1)
