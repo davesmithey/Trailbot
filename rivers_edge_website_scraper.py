@@ -119,7 +119,7 @@ def extract_distances(page_text):
     distances = []
 
     # First try to find the "Races:" section and extract all distances from that line
-    races_match = re.search(r'Races:\s*(.+?)((?=When:|Where:|$)', page_text, re.IGNORECASE | re.DOTALL)
+    races_match = re.search(r'Rces:\s*(.+?)((?=When:|Where:|$)', page_text, re.IGNORECASE | re.DOTALL)
     if races_match:
         races_text = races_match.group(1)
         # Extract all distance patterns: "50k", "25k", "10 mi", "5 mi", etc.
