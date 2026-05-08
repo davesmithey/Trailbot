@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import json
 import os
 import base64
-from datetime import datetime
+Page_DownPage_DownPage_Downfrom datetime import datetime
 import re
 
 # Configuration
@@ -124,7 +124,7 @@ def extract_distances(page_text):
         races_text = races_match.group(1)
         # Extract all distance patterns: "50k", "25k", "10 mi", "5 mi", etc.
         distance_patterns = [
-            r'(\d+(?:k|km|mi|mile|miles))',  # Catch 50k, 25k, 10 mi, etc.
+r'(\d+\s*(?:k|km|mi|mile|miles))',  # Catch 50k, 25k, 10 mi, etc.
         ]
 
         for pattern in distance_patterns:
