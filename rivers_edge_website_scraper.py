@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
-import base64
+r'(\d+(?:k|km|mi|mile|miles))import base64
 from datetime import datetime
 import re
 
