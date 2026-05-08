@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import json
 import os
 import base64
-import datetime
+from datetime import datetime
 import re
 
 # Configuration
